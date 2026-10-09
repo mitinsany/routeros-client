@@ -11,3 +11,6 @@ command helpers are covered by isolated tests.
 
 See [docs/branching.md](docs/branching.md) for Docker verification commands
 and the PHP branch policy.
+
+The clean-room technical provenance is described in
+[docs/provenance.md](docs/provenance.md).
