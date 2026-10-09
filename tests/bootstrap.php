@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 $vendor = getenv('ROUTEROS_TEST_VENDOR');
 if ($vendor === false || $vendor === '') {
     $vendor = __DIR__ . '/../vendor';
