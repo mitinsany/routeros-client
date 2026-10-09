@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace MitinSany\RouterOS\Tests;
 
 use MitinSany\RouterOS\Tests\Support\ScriptedTransport;
