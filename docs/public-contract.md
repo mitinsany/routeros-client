@@ -5,7 +5,7 @@ public names retained while the implementation is built.
 
 ## Api
 
-Public properties: `debug`, `error_no`, `error_str`, `attempts`, `connected`,
+Public properties: `debug`, `errorNo`, `errorString`, `attempts`, `connected`,
 `delay`, `port`, `timeout`, and `sock`.
 
 Public methods: `connect()`, `debug()`, `write()`, `encodeLength()`, `read()`,
@@ -14,7 +14,7 @@ Public methods: `connect()`, `debug()`, `write()`, `encodeLength()`, `read()`,
 
 `connect($host, $user, $password)` sends RouterOS plain-text `/login` and
 returns `true` only after `!done`; it returns `false` for a trap, transport
-error, or unsuccessful connection, setting `error_str` when a message is
+error, or unsuccessful connection, setting `errorString` when a message is
 available. `command($path, $attributes)` writes `=key=value` attributes and
 returns an array of `!re` records; it returns `false` after `!trap` or a
 transport failure. Attribute values preserve embedded equal signs. `read()`

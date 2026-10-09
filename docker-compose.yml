@@ -12,17 +12,17 @@ services:
       - .:/app
     working_dir: /app
   php70:
-    image: routeros-client-php70:latest
+    image: php:7.0.33-cli
     volumes:
       - .:/app
     working_dir: /app
   php72:
-    image: routeros-client-php72:latest
+    image: php:7.2.34-cli
     volumes:
       - .:/app
     working_dir: /app
   php80:
-    image: routeros-client-php80:latest
+    image: php:8.0.30-cli
     volumes:
       - .:/app
     working_dir: /app
