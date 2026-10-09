@@ -12,8 +12,8 @@ use MitinSany\RouterOS\Protocol\WordCodec;
 class Api
 {
     public $debug = false;
-    public $error_no;
-    public $error_str;
+    public $errorNo;
+    public $errorString;
     public $attempts = 5;
     public $connected = false;
     public $delay = 3;
@@ -31,8 +31,8 @@ class Api
     public function connect($ip, $login, $password)
     {
         $this->connected = false;
-        $this->error_no = null;
-        $this->error_str = null;
+        $this->errorNo = null;
+        $this->errorString = null;
 
         try {
             $this->transport = $this->createTransport($ip);
@@ -44,7 +44,9 @@ class Api
             $this->write(array('/login', '=name=' . $login, '=password=' . $password));
             $response = $this->read(false);
 
-            if ($this->hasResponseType($response, '!done')) {
+            if ($this->hasResponseType($response, '!trap') || $this->hasResponseType($response, '!fatal')) {
+                $this->setErrorFromResponse($response);
+            } elseif ($this->hasResponseType($response, '!done')) {
                 $this->connected = true;
 
                 return true;
@@ -52,7 +54,7 @@ class Api
 
             $this->setErrorFromResponse($response);
         } catch (Exception $exception) {
-            $this->error_str = $exception->getMessage();
+            $this->errorString = $exception->getMessage();
         }
 
         $this->disconnect();
@@ -109,7 +111,7 @@ class Api
             $sentence = $this->getTransport()->readSentence();
             $responses[] = $sentence;
 
-            if ($this->sentenceHasType($sentence, '!done') || $this->sentenceHasType($sentence, '!trap')) {
+            if ($this->sentenceHasType($sentence, '!done')) {
                 break;
             }
         }
@@ -208,7 +210,7 @@ class Api
 
             return $this->read(true);
         } catch (Exception $exception) {
-            $this->error_str = $exception->getMessage();
+            $this->errorString = $exception->getMessage();
 
             return false;
         }
@@ -216,7 +218,7 @@ class Api
 
     protected function createTransport($ip)
     {
-        $this->sock = @fsockopen($ip, $this->port, $this->error_no, $this->error_str, $this->timeout);
+        $this->sock = @fsockopen($ip, $this->port, $this->errorNo, $this->errorString, $this->timeout);
         if ($this->sock === false) {
             return false;
         }
@@ -257,7 +259,7 @@ class Api
             }
 
             $attributes = $this->parseAttributes($sentence);
-            $this->error_str = isset($attributes['message']) ? $attributes['message'] : 'RouterOS request failed.';
+            $this->errorString = isset($attributes['message']) ? $attributes['message'] : 'RouterOS request failed.';
 
             return;
         }

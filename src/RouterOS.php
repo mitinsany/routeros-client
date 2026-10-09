@@ -177,7 +177,7 @@ class RouterOS extends Api
         try {
             $responses = $this->read(false);
         } catch (Exception $exception) {
-            $this->error_str = $exception->getMessage();
+            $this->errorString = $exception->getMessage();
 
             return false;
         }
@@ -243,7 +243,7 @@ class RouterOS extends Api
 
             return $this->read(true);
         } catch (Exception $exception) {
-            $this->error_str = $exception->getMessage();
+            $this->errorString = $exception->getMessage();
 
             return false;
         }

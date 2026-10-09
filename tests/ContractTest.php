@@ -11,7 +11,7 @@ class ContractTest extends TestCase
         $this->assertClassContract(
             'MitinSany\\RouterOS\\Api',
             array(
-                'debug', 'error_no', 'error_str', 'attempts', 'connected', 'delay',
+                'debug', 'errorNo', 'errorString', 'attempts', 'connected', 'delay',
                 'port', 'timeout', 'sock'
             ),
             array(

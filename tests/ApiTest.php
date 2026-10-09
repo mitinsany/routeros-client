@@ -25,12 +25,12 @@ class ApiTest extends TestCase
 
     public function testConnectReturnsFalseForTrap()
     {
-        $transport = new ScriptedTransport(array(array('!trap', '=message=denied')));
+        $transport = new ScriptedTransport(array(array('!trap', '=message=denied'), array('!done')));
         $api = new TestApi($transport);
 
         $this->assertFalse($api->connect('router.example', 'admin', 'wrong'));
         $this->assertFalse($api->connected);
-        $this->assertSame('denied', $api->error_str);
+        $this->assertSame('denied', $api->errorString);
     }
 
     public function testCommandWritesAttributesAndParsesRecords()
@@ -55,11 +55,30 @@ class ApiTest extends TestCase
 
     public function testCommandReturnsFalseAfterTrap()
     {
-        $transport = new ScriptedTransport(array(array('!trap', '=message=not allowed')));
+        $transport = new ScriptedTransport(array(array('!trap', '=message=not allowed'), array('!done')));
         $api = new TestApi($transport);
 
         $this->assertFalse($api->command('/system/reboot'));
-        $this->assertSame('not allowed', $api->error_str);
+        $this->assertSame('not allowed', $api->errorString);
+    }
+
+    public function testCommandDrainsDoneAfterTrapBeforeNextRequest()
+    {
+        $transport = new ScriptedTransport(
+            array(
+                array('!trap', '=message=not allowed'),
+                array('!done'),
+                array('!re', '=name=ether1'),
+                array('!done')
+            )
+        );
+        $api = new TestApi($transport);
+
+        $this->assertFalse($api->command('/system/reboot'));
+        $this->assertSame(
+            array(array('name' => 'ether1')),
+            $api->command('/interface/print')
+        );
     }
 
     public function testDisconnectClosesTransport()
