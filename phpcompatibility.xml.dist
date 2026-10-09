@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
-<ruleset name="RouterOS client PHP 5.4 compatibility">
-    <config name="testVersion" value="5.4"/>
+<ruleset name="RouterOS client PHP 7 compatibility">
+    <config name="testVersion" value="7.0"/>
     <rule ref="PHPCompatibility"/>
     <file>src</file>
     <file>tests</file>

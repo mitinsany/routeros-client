@@ -2,7 +2,7 @@
 
 An independently authored PHP client for the MikroTik RouterOS API protocol.
 
-The initial development branch is `php5` and supports PHP `>=5.4 <7.0`.
+This `php7` branch supports PHP `>=7.0 <8.0`.
 The library exposes the `MitinSany\RouterOS` namespace.
 
 The supported public surface is recorded in
