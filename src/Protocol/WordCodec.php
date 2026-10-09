@@ -5,8 +5,16 @@ namespace MitinSany\RouterOS\Protocol;
 use InvalidArgumentException;
 use UnexpectedValueException;
 
+/**
+ * Encodes and decodes RouterOS API words and variable-length prefixes.
+ */
 class WordCodec
 {
+    /**
+     * Encodes an unsigned RouterOS word length.
+     *
+     * @return string Binary prefix.
+     */
     public static function encodeLength($length)
     {
         if (!is_int($length) || $length < 0 || $length > 0xffffffff) {
@@ -41,6 +49,11 @@ class WordCodec
             . chr($length & 0xff);
     }
 
+    /**
+     * Decodes a word length using a callable for trailing prefix bytes.
+     *
+     * @return int
+     */
     public static function decodeLength($first, $reader)
     {
         if (!is_string($first) || strlen($first) !== 1) {
@@ -87,6 +100,11 @@ class WordCodec
         throw new InvalidArgumentException('RouterOS control byte is reserved.');
     }
 
+    /**
+     * Prefixes a string with its RouterOS word length.
+     *
+     * @return string
+     */
     public static function encodeWord($value)
     {
         if (!is_string($value)) {
@@ -96,6 +114,11 @@ class WordCodec
         return self::encodeLength(strlen($value)) . $value;
     }
 
+    /**
+     * Reads a single complete RouterOS word.
+     *
+     * @return string
+     */
     public static function decodeWord($reader)
     {
         $first = self::readExactly($reader, 1);
