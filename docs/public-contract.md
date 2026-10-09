@@ -29,6 +29,14 @@ Public methods: `setTimeout()`, `getAll()`, `set()`, `reboot()`, `fetchUrl()`,
 `cancel()`, `move()`, `add()`, `remove()`, `unsetValue()`, `scan()`,
 `frequencyMonitor()`, `listen()`, `bandwidthTest()`, and `dispatch()`.
 
+`getAll($path)` reads `!re` records from `$path/print` and returns `false` on
+`!trap`. Mutating helpers return `true` after `!done`, `false` after a trap or
+when `readOnly` is true, and a callback tag when passed a callback. `listen()`
+always requires a callback and returns its tag. `dispatch(&$continue)` calls
+callbacks as `($router, $success, $reply)`; an `!re` reply has `true` and an
+attribute array, `!trap` has `false`, and `!done` has `true` and `null`.
+Setting `$continue` to `false` stops further callback invocation.
+
 ## ConfigurationSynchronizer
 
 Public properties: `vars`, `logs`, `showIgnored`, and `currentContext`.
