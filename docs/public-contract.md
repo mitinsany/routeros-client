@@ -12,6 +12,15 @@ Public methods: `connect()`, `debug()`, `write()`, `encodeLength()`, `read()`,
 `parseResponse()`, `disconnect()`, `parseResponseForSmarty()`,
 `changeArrayKeyName()`, and `command()`.
 
+`connect($host, $user, $password)` sends RouterOS plain-text `/login` and
+returns `true` only after `!done`; it returns `false` for a trap, transport
+error, or unsuccessful connection, setting `error_str` when a message is
+available. `command($path, $attributes)` writes `=key=value` attributes and
+returns an array of `!re` records; it returns `false` after `!trap` or a
+transport failure. Attribute values preserve embedded equal signs. `read()`
+stops after `!done` or `!trap`; with its default argument it returns parsed
+records, otherwise it returns raw response sentences.
+
 ## RouterOS
 
 Public properties: `sock`, `hostname`, and `readOnly`.
