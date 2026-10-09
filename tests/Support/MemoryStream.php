@@ -8,8 +8,8 @@ class MemoryStream
 {
     // phpcs:disable PSR1.Methods.CamelCapsMethodName
 
-    public static $buffers = array();
-    public static $chunkSizes = array();
+    public static $buffers = [];
+    public static $chunkSizes = [];
 
     private $key;
     private $position = 0;
@@ -77,7 +77,7 @@ class MemoryStream
 
     public function stream_stat()
     {
-        return array();
+        return [];
     }
 
     public function stream_set_option($option, $arg1, $arg2)

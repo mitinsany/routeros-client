@@ -43,7 +43,7 @@ class Api
             }
 
             $this->transport->setTimeout($this->timeout);
-            $this->write(array('/login', '=name=' . $login, '=password=' . $password));
+            $this->write(['/login', '=name=' . $login, '=password=' . $password]);
             $response = $this->read(false);
 
             if ($this->hasResponseType($response, '!trap') || $this->hasResponseType($response, '!fatal')) {
@@ -82,9 +82,9 @@ class Api
         if (is_array($command)) {
             $words = $command;
         } elseif (is_array($param2)) {
-            $words = array_merge(array($command), $param2);
+            $words = array_merge([$command], $param2);
         } else {
-            $words = array($command);
+            $words = [$command];
         }
 
         $this->getTransport()->writeSentence($words);
@@ -107,7 +107,7 @@ class Api
      */
     public function read($parse = true)
     {
-        $responses = array();
+        $responses = [];
 
         while (true) {
             $sentence = $this->getTransport()->readSentence();
@@ -133,14 +133,14 @@ class Api
     public function parseResponse($response)
     {
         if (empty($response)) {
-            return array();
+            return [];
         }
 
         if (isset($response[0]) && is_string($response[0])) {
-            $response = array($response);
+            $response = [$response];
         }
 
-        $records = array();
+        $records = [];
         foreach ($response as $sentence) {
             if ($this->sentenceHasType($sentence, '!re')) {
                 $records[] = $this->parseAttributes($sentence);
@@ -148,7 +148,7 @@ class Api
             }
 
             if ($this->sentenceHasType($sentence, '!trap') || $this->sentenceHasType($sentence, '!fatal')) {
-                $this->setErrorFromResponse(array($sentence));
+                $this->setErrorFromResponse([$sentence]);
 
                 return false;
             }
@@ -200,9 +200,9 @@ class Api
      *
      * @return array|false
      */
-    public function command($com, $arr = array())
+    public function command($com, $arr = [])
     {
-        $words = array($com);
+        $words = [$com];
         foreach ($arr as $key => $value) {
             $words[] = '=' . $key . '=' . $value;
         }
@@ -269,7 +269,7 @@ class Api
 
     private function parseAttributes(array $sentence)
     {
-        $attributes = array();
+        $attributes = [];
         foreach ($sentence as $word) {
             if (!is_string($word) || substr($word, 0, 1) !== '=') {
                 continue;

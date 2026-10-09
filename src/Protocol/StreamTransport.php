@@ -44,7 +44,7 @@ class StreamTransport
      */
     public function readSentence()
     {
-        $words = array();
+        $words = [];
 
         while (true) {
             $word = $this->readWord();

@@ -13,21 +13,21 @@ class ApiTest extends TestCase
 {
     public function testConnectSendsPlainTextLoginAndAcceptsDone()
     {
-        $transport = new ScriptedTransport(array(array('!done')));
+        $transport = new ScriptedTransport([['!done']]);
         $api = new TestApi($transport);
 
         $this->assertTrue($api->connect('router.example', 'admin', 'secret'));
         $this->assertTrue($api->connected);
         $this->assertSame(3, $transport->timeout);
         $this->assertSame(
-            array(array('/login', '=name=admin', '=password=secret')),
+            [['/login', '=name=admin', '=password=secret']],
             $transport->sentences
         );
     }
 
     public function testConnectReturnsFalseForTrap()
     {
-        $transport = new ScriptedTransport(array(array('!trap', '=message=denied'), array('!done')));
+        $transport = new ScriptedTransport([['!trap', '=message=denied'], ['!done']]);
         $api = new TestApi($transport);
 
         $this->assertFalse($api->connect('router.example', 'admin', 'wrong'));
@@ -38,26 +38,26 @@ class ApiTest extends TestCase
     public function testCommandWritesAttributesAndParsesRecords()
     {
         $transport = new ScriptedTransport(
-            array(
-                array('!re', '=name=ether1', '=comment=a=b'),
-                array('!done')
-            )
+            [
+                ['!re', '=name=ether1', '=comment=a=b'],
+                ['!done']
+            ]
         );
         $api = new TestApi($transport);
 
         $this->assertSame(
-            array(array('name' => 'ether1', 'comment' => 'a=b')),
-            $api->command('/interface/print', array('detail' => 'yes'))
+            [['name' => 'ether1', 'comment' => 'a=b']],
+            $api->command('/interface/print', ['detail' => 'yes'])
         );
         $this->assertSame(
-            array(array('/interface/print', '=detail=yes')),
+            [['/interface/print', '=detail=yes']],
             $transport->sentences
         );
     }
 
     public function testCommandReturnsFalseAfterTrap()
     {
-        $transport = new ScriptedTransport(array(array('!trap', '=message=not allowed'), array('!done')));
+        $transport = new ScriptedTransport([['!trap', '=message=not allowed'], ['!done']]);
         $api = new TestApi($transport);
 
         $this->assertFalse($api->command('/system/reboot'));
@@ -67,25 +67,25 @@ class ApiTest extends TestCase
     public function testCommandDrainsDoneAfterTrapBeforeNextRequest()
     {
         $transport = new ScriptedTransport(
-            array(
-                array('!trap', '=message=not allowed'),
-                array('!done'),
-                array('!re', '=name=ether1'),
-                array('!done')
-            )
+            [
+                ['!trap', '=message=not allowed'],
+                ['!done'],
+                ['!re', '=name=ether1'],
+                ['!done']
+            ]
         );
         $api = new TestApi($transport);
 
         $this->assertFalse($api->command('/system/reboot'));
         $this->assertSame(
-            array(array('name' => 'ether1')),
+            [['name' => 'ether1']],
             $api->command('/interface/print')
         );
     }
 
     public function testDisconnectClosesTransport()
     {
-        $transport = new ScriptedTransport(array(array('!done')));
+        $transport = new ScriptedTransport([['!done']]);
         $api = new TestApi($transport);
         $api->connect('router.example', 'admin', 'secret');
 
