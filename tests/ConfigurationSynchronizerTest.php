@@ -70,12 +70,15 @@ class ConfigurationSynchronizerTest extends TestCase
     public function testUpdateSectionOnlyAppliesRegisteredSectionPath()
     {
         $synchronizer = new ConfigurationSynchronizer();
-        $synchronizer->section('queues', '/queue/simple', 'set');
+        $synchronizer->section('queues', '/queue/simple', 'set', 'name');
         $synchronizer->config('/queue/simple', array('name' => 'edge'));
         $synchronizer->config('/ip/address', array('address' => '192.0.2.1/24'));
         $router = new RecordingRouter();
+        $router->responses['/queue/simple'] = array(
+            array('.id' => '*1', 'name' => 'edge', 'comment' => 'old')
+        );
 
         $this->assertTrue($synchronizer->updateSection($router, 'queues'));
-        $this->assertSame(array(array('/queue/simple', array('name' => 'edge'))), $router->sets);
+        $this->assertSame(array(), $router->sets);
     }
 }

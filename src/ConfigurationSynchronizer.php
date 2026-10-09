@@ -3,7 +3,7 @@
 namespace MitinSany\RouterOS;
 
 /**
- * Collects declarative RouterOS configuration entries and applies them to a client.
+ * Synchronizes declarative RouterOS configuration with a RouterOS client.
  */
 class ConfigurationSynchronizer
 {
@@ -102,23 +102,22 @@ class ConfigurationSynchronizer
 
             if ($directive === 'define') {
                 $key = array_shift($parts);
-
                 $this->define($key, implode(' ', $parts));
                 continue;
             }
 
-            $path = array_shift($parts);
+            $reference = array_shift($parts);
             $attributes = $this->parseAttributes($parts, $lineNumber + 1);
             if ($attributes === false) {
                 return false;
             }
 
             if ($directive === 'config') {
-                $this->config($path, $attributes);
+                $this->config($reference, $attributes);
             } elseif ($directive === 'ignore') {
-                $this->ignore($path, $attributes);
+                $this->ignore($reference, $attributes);
             } elseif ($directive === 'pass') {
-                $this->pass($path, $attributes);
+                $this->pass($reference, $attributes);
             } else {
                 return $this->error('Unknown directive at line ' . ($lineNumber + 1) . '.');
             }
@@ -129,6 +128,10 @@ class ConfigurationSynchronizer
 
     public function replace($string)
     {
+        if (!is_string($string)) {
+            return $string;
+        }
+
         $synchronizer = $this;
 
         return preg_replace_callback('/\{\{([^}]+)\}\}/', function ($matches) use ($synchronizer) {
@@ -152,13 +155,23 @@ class ConfigurationSynchronizer
         return $value;
     }
 
-    public function config($cmd, $line, $reverse = false)
+    public function config($reference, $attributes, $reverse = false)
     {
-        if (!is_array($line)) {
+        $attributes = $this->normaliseAttributes($attributes);
+        if ($attributes === false) {
             return $this->error('Configuration attributes must be an array.');
         }
 
-        $this->configurations[] = array('cmd' => $cmd, 'line' => $line, 'reverse' => $reverse);
+        $key = $this->referenceKey($reference);
+        if (!isset($this->configurations[$key])) {
+            $this->configurations[$key] = array();
+        }
+
+        if ($reverse) {
+            array_unshift($this->configurations[$key], $attributes);
+        } else {
+            $this->configurations[$key][] = $attributes;
+        }
 
         return true;
     }
@@ -170,23 +183,33 @@ class ConfigurationSynchronizer
         return true;
     }
 
-    public function ignore($cmd, $line)
+    public function ignore($reference, $attributes)
     {
-        return $this->addRule($this->ignoreRules, $cmd, $line);
+        return $this->addRule($this->ignoreRules, $this->referenceKey($reference), $attributes);
     }
 
-    public function pass($cmd, $line)
+    public function pass($reference, $attributes)
     {
-        return $this->addRule($this->passRules, $cmd, $line);
+        return $this->addRule($this->passRules, $this->referenceKey($reference), $attributes);
     }
 
-    public function section($alias, $cmd, $type, $keys = false, $defaults = false)
+    public function section($alias, $path, $type, $keys = false, $defaults = false)
     {
+        $allowedTypes = array('value', 'set', 'addset', 'addset_order');
+        if (!in_array($type, $allowedTypes, true)) {
+            return $this->error('Unknown configuration section type: ' . $type);
+        }
+
+        $normalisedDefaults = $this->normaliseAttributes($defaults === false ? array() : $defaults);
+        if ($normalisedDefaults === false) {
+            return $this->error('Section defaults must be an array.');
+        }
+
         $this->sections[$alias] = array(
-            'cmd' => $cmd,
+            'path' => $path,
             'type' => $type,
-            'keys' => $keys,
-            'defaults' => $defaults
+            'keys' => $this->normaliseKeys($keys),
+            'defaults' => $normalisedDefaults
         );
 
         return true;
@@ -203,16 +226,408 @@ class ConfigurationSynchronizer
 
     public function update($conn, $ret = false)
     {
-        return $this->apply($conn, false);
-    }
+        $this->logs = array();
 
-    public function updateSection($conn, $alias)
-    {
-        if (!isset($this->sections[$alias])) {
-            return $this->error('Unknown configuration section: ' . $alias);
+        foreach ($this->sections as $alias => $section) {
+            if (!$this->updateSection($conn, $alias)) {
+                return false;
+            }
         }
 
-        return $this->apply($conn, $this->sections[$alias]['cmd']);
+        foreach ($this->configurations as $key => $configurations) {
+            if ($this->sectionForReference($key) !== false) {
+                continue;
+            }
+            if (!$this->updateStandalone($conn, $key, $configurations)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    public function updateSection($conn, $reference)
+    {
+        $alias = $this->sectionForReference($reference);
+        if ($alias === false) {
+            return $this->error('Unknown configuration section: ' . $reference);
+        }
+        if (!is_object($conn) || !method_exists($conn, 'getAll')) {
+            return $this->error('RouterOS connection must provide getAll().');
+        }
+
+        $section = $this->sections[$alias];
+        $current = $conn->getAll($section['path']);
+        if ($current === false) {
+            return $this->error('getAll failed ' . $section['path']);
+        }
+
+        if ($section['type'] === 'value') {
+            return $this->updateValueSection($conn, $alias, $section, $current);
+        }
+
+        return $this->updateListSection($conn, $alias, $section, $this->normaliseRecords($current));
+    }
+
+    private function updateStandalone($conn, $key, array $configurations)
+    {
+        if (!is_object($conn) || !method_exists($conn, 'set')) {
+            return $this->error('RouterOS connection must provide set().');
+        }
+
+        $path = $this->pathFromKey($key);
+        foreach ($configurations as $configuration) {
+            $attributes = $this->replaceAttributes($configuration);
+            if ($this->isIgnored($key, $attributes)) {
+                $this->log('ignore', $path);
+                continue;
+            }
+            if (!$this->isPassed($key, $attributes)) {
+                $this->log('nopass', $path);
+                continue;
+            }
+            if ($conn->set($path, $attributes) === false) {
+                return $this->operationFailed('set', $path);
+            }
+            $this->log('set', $path);
+        }
+
+        return true;
+    }
+
+    private function updateValueSection($conn, $alias, array $section, $current)
+    {
+        if (!is_object($conn) || !method_exists($conn, 'set')) {
+            return $this->error('RouterOS connection must provide set().');
+        }
+
+        $desired = array();
+        foreach ($this->sectionConfigurations($alias) as $configuration) {
+            $configuration = $this->desiredAttributes($section, $configuration);
+            if ($this->isIgnored($alias, $configuration)) {
+                $this->log('ignore', $section['path']);
+                continue;
+            }
+            if (!$this->isPassed($alias, $configuration)) {
+                $this->log('nopass', $section['path']);
+                continue;
+            }
+            $desired = array_merge($desired, $configuration);
+        }
+
+        if (count($desired) === 0) {
+            return true;
+        }
+
+        $records = $this->normaliseRecords($current);
+        if (count($records) === 0) {
+            return true;
+        }
+
+        $changes = $this->changes($records[0], $desired);
+        if (count($changes) === 0) {
+            return true;
+        }
+        if ($conn->set($section['path'], $changes) === false) {
+            return $this->operationFailed('set', $section['path']);
+        }
+        $this->log('set', $section['path']);
+
+        return true;
+    }
+
+    private function updateListSection($conn, $alias, array $section, array $current)
+    {
+        $type = $section['type'];
+        if (!is_object($conn) || !method_exists($conn, 'set')) {
+            return $this->error('RouterOS connection must provide set().');
+        }
+
+        $desired = array();
+        foreach ($this->sectionConfigurations($alias) as $configuration) {
+            $configuration = $this->desiredAttributes($section, $configuration);
+            if ($this->isIgnored($alias, $configuration)) {
+                $this->log('ignore', $section['path']);
+                continue;
+            }
+            if (!$this->isPassed($alias, $configuration)) {
+                $this->log('nopass', $section['path']);
+                continue;
+            }
+            $desired[] = $configuration;
+        }
+
+        $matched = array();
+        $currentOrder = array();
+        foreach ($current as $record) {
+            $id = isset($record['.id']) ? $record['.id'] : null;
+            if ($this->isIgnored($alias, $record)) {
+                $this->log('ignore', $section['path'], $id);
+                continue;
+            }
+            if (!$this->isPassed($alias, $record)) {
+                $this->log('nopass', $section['path'], $id);
+                continue;
+            }
+
+            $index = $this->findMatch($record, $desired, $matched, $section['keys']);
+            if ($index !== false) {
+                if ($this->isDynamic($record)) {
+                    if (!$this->remove($conn, $section['path'], $id)) {
+                        return false;
+                    }
+                    continue;
+                }
+                $matched[$index] = $id;
+                if ($id !== null) {
+                    $currentOrder[] = $id;
+                }
+                $changes = $this->changes($record, $desired[$index]);
+                if (count($changes) > 0) {
+                    $changes['.id'] = $id;
+                    if ($conn->set($section['path'], $changes) === false) {
+                        return $this->operationFailed('set', $section['path'], $id);
+                    }
+                    $this->log('set', $section['path'], $id);
+                }
+                continue;
+            }
+
+            if (($type === 'addset' || $type === 'addset_order') && $this->mayRemove($alias, $section, $record)) {
+                if (!$this->remove($conn, $section['path'], $id)) {
+                    return false;
+                }
+            }
+        }
+
+        if ($type === 'addset' || $type === 'addset_order') {
+            if (!$this->addMissing($conn, $section, $desired, $matched)) {
+                return false;
+            }
+        }
+
+        if ($type === 'addset_order') {
+            return $this->orderRecords($conn, $section['path'], $matched, $currentOrder);
+        }
+
+        return true;
+    }
+
+    private function addMissing($conn, array $section, array $desired, array &$matched)
+    {
+        if (!method_exists($conn, 'add')) {
+            return $this->error('RouterOS connection must provide add().');
+        }
+
+        foreach ($desired as $index => $attributes) {
+            if (isset($matched[$index])) {
+                continue;
+            }
+            if ($section['type'] === 'addset_order') {
+                $before = $this->nextMatchedId($matched, $index, count($desired));
+                if ($before !== null) {
+                    $attributes['place-before'] = $before;
+                }
+            }
+            $result = $conn->add($section['path'], $attributes);
+            if ($result === false) {
+                return $this->operationFailed('add', $section['path']);
+            }
+            if (is_string($result) && $result !== '') {
+                $matched[$index] = $result;
+            }
+            $this->log('add', $section['path']);
+        }
+
+        return true;
+    }
+
+    private function orderRecords($conn, $path, array $matched, array $currentOrder)
+    {
+        if (!method_exists($conn, 'move')) {
+            return $this->error('RouterOS connection must provide move().');
+        }
+
+        ksort($matched);
+        $desiredOrder = array();
+        foreach ($matched as $id) {
+            if (is_string($id) && $id !== '') {
+                $desiredOrder[] = $id;
+            }
+        }
+
+        foreach ($desiredOrder as $position => $id) {
+            if (isset($currentOrder[$position]) && $currentOrder[$position] === $id) {
+                continue;
+            }
+            $found = array_search($id, $currentOrder, true);
+            if ($found === false || !isset($currentOrder[$position])) {
+                continue;
+            }
+            $before = $currentOrder[$position];
+            if ($conn->move($path, $id, $before) === false) {
+                return $this->operationFailed('move', $path, $id);
+            }
+            array_splice($currentOrder, $found, 1);
+            array_splice($currentOrder, $position, 0, array($id));
+            $this->log('move', $path, $id, $before);
+        }
+
+        return true;
+    }
+
+    private function remove($conn, $path, $id)
+    {
+        if ($id === null || !method_exists($conn, 'remove')) {
+            return $this->error('RouterOS connection must provide remove().');
+        }
+        if ($conn->remove($path, $id) === false) {
+            return $this->operationFailed('remove', $path, $id);
+        }
+        $this->log('remove', $path, $id);
+
+        return true;
+    }
+
+    private function mayRemove($alias, array $section, array $record)
+    {
+        if ($this->isDefault($record) || $this->isDynamic($record)) {
+            return false;
+        }
+        if (isset($this->passRules[$alias])) {
+            return $this->isPassed($alias, $record);
+        }
+        if (count($section['defaults']) > 0) {
+            return $this->matches($record, $this->replaceAttributes($section['defaults']));
+        }
+
+        return false;
+    }
+
+    private function findMatch(array $record, array $desired, array $matched, array $keys)
+    {
+        if (count($keys) === 0) {
+            return false;
+        }
+        foreach ($desired as $index => $attributes) {
+            if (isset($matched[$index])) {
+                continue;
+            }
+            $match = true;
+            foreach ($keys as $key) {
+                if (
+                    !array_key_exists($key, $record)
+                    || !array_key_exists($key, $attributes)
+                    || !$this->valuesEquivalent($record[$key], $attributes[$key])
+                ) {
+                    $match = false;
+                    break;
+                }
+            }
+            if ($match) {
+                return $index;
+            }
+        }
+
+        return false;
+    }
+
+    private function changes(array $current, array $desired)
+    {
+        $changes = array();
+        foreach ($desired as $key => $value) {
+            if (!array_key_exists($key, $current) || !$this->valuesEquivalent($current[$key], $value)) {
+                $changes[$key] = $value;
+            }
+        }
+
+        return $changes;
+    }
+
+    private function desiredAttributes(array $section, array $configuration)
+    {
+        return $this->replaceAttributes(array_merge($section['defaults'], $configuration));
+    }
+
+    private function sectionConfigurations($alias)
+    {
+        return isset($this->configurations[$alias]) ? $this->configurations[$alias] : array();
+    }
+
+    private function referenceKey($reference)
+    {
+        $alias = $this->sectionForReference($reference);
+
+        return $alias === false ? 'path:' . $reference : $alias;
+    }
+
+    private function sectionForReference($reference)
+    {
+        if (isset($this->sections[$reference])) {
+            return $reference;
+        }
+        foreach ($this->sections as $alias => $section) {
+            if ($section['path'] === $reference) {
+                return $alias;
+            }
+        }
+
+        return false;
+    }
+
+    private function pathFromKey($key)
+    {
+        return substr($key, 0, 5) === 'path:' ? substr($key, 5) : $key;
+    }
+
+    private function normaliseKeys($keys)
+    {
+        if ($keys === false || $keys === null || $keys === '') {
+            return array();
+        }
+        if (is_array($keys)) {
+            return array_values($keys);
+        }
+
+        return preg_split('/\s*,\s*/', $keys);
+    }
+
+    private function normaliseAttributes($attributes)
+    {
+        if ($attributes === false) {
+            return array();
+        }
+        if (!is_array($attributes)) {
+            return false;
+        }
+
+        $normalised = array();
+        foreach ($attributes as $key => $value) {
+            if (is_int($key) && is_string($value)) {
+                $pair = explode('=', $value, 2);
+                if (count($pair) !== 2 || $pair[0] === '') {
+                    return false;
+                }
+                $normalised[$pair[0]] = $pair[1];
+            } else {
+                $normalised[$key] = $value;
+            }
+        }
+
+        return $normalised;
+    }
+
+    private function normaliseRecords($records)
+    {
+        if (!is_array($records) || count($records) === 0) {
+            return array();
+        }
+        $first = reset($records);
+        if (!is_array($first)) {
+            return array($records);
+        }
+
+        return $records;
     }
 
     private function parseAttributes(array $parts, $lineNumber)
@@ -225,50 +640,22 @@ class ConfigurationSynchronizer
 
                 return false;
             }
-
             $attributes[$pair[0]] = $pair[1];
         }
 
         return $attributes;
     }
 
-    private function addRule(&$rules, $cmd, $line)
+    private function addRule(&$rules, $key, $attributes)
     {
-        if (!is_array($line)) {
+        $attributes = $this->normaliseAttributes($attributes);
+        if ($attributes === false) {
             return $this->error('Rule attributes must be an array.');
         }
-
-        if (!isset($rules[$cmd])) {
-            $rules[$cmd] = array();
+        if (!isset($rules[$key])) {
+            $rules[$key] = array();
         }
-
-        $rules[$cmd][] = $line;
-
-        return true;
-    }
-
-    private function apply($conn, $sectionPath)
-    {
-        if (!is_object($conn) || !method_exists($conn, 'set')) {
-            return $this->error('RouterOS connection must provide set().');
-        }
-
-        foreach ($this->configurations as $configuration) {
-            if ($sectionPath !== false && $configuration['cmd'] !== $sectionPath) {
-                continue;
-            }
-
-            $attributes = $this->replaceAttributes($configuration['line']);
-            $ignored = $this->isIgnored($configuration['cmd'], $attributes);
-            $passed = $this->isPassed($configuration['cmd'], $attributes);
-            if ($ignored || !$passed) {
-                continue;
-            }
-
-            if ($conn->set($configuration['cmd'], $attributes) === false) {
-                return $this->error('RouterOS rejected configuration for ' . $configuration['cmd'] . '.');
-            }
-        }
+        $rules[$key][] = $attributes;
 
         return true;
     }
@@ -282,28 +669,26 @@ class ConfigurationSynchronizer
         return $attributes;
     }
 
-    private function isIgnored($cmd, array $attributes)
+    private function isIgnored($key, array $attributes)
     {
-        if (!isset($this->ignoreRules[$cmd])) {
-            return false;
-        }
-
-        foreach ($this->ignoreRules[$cmd] as $rule) {
-            if ($this->matches($attributes, $this->replaceAttributes($rule))) {
-                return true;
-            }
-        }
-
-        return false;
+        return $this->matchesRules($this->ignoreRules, $key, $attributes);
     }
 
-    private function isPassed($cmd, array $attributes)
+    private function isPassed($key, array $attributes)
     {
-        if (!isset($this->passRules[$cmd])) {
+        if (!isset($this->passRules[$key])) {
             return true;
         }
 
-        foreach ($this->passRules[$cmd] as $rule) {
+        return $this->matchesRules($this->passRules, $key, $attributes);
+    }
+
+    private function matchesRules(array $rules, $key, array $attributes)
+    {
+        if (!isset($rules[$key])) {
+            return false;
+        }
+        foreach ($rules[$key] as $rule) {
             if ($this->matches($attributes, $this->replaceAttributes($rule))) {
                 return true;
             }
@@ -315,11 +700,76 @@ class ConfigurationSynchronizer
     private function matches(array $attributes, array $rule)
     {
         foreach ($rule as $key => $value) {
-            if (!isset($attributes[$key]) || $attributes[$key] !== $value) {
+            if (!array_key_exists($key, $attributes) || !$this->valuesEquivalent($attributes[$key], $value)) {
                 return false;
             }
         }
 
         return true;
+    }
+
+    private function valuesEquivalent($left, $right)
+    {
+        $left = $this->normaliseValue($left);
+        $right = $this->normaliseValue($right);
+        if ($left === $right) {
+            return true;
+        }
+
+        return ($left === '' && ($right === 'false' || $right === 'no'))
+            || ($right === '' && ($left === 'false' || $left === 'no'));
+    }
+
+    private function normaliseValue($value)
+    {
+        if ($value === false) {
+            $value = 'false';
+        } elseif ($value === true) {
+            $value = 'true';
+        } elseif ($value === null) {
+            $value = '';
+        } else {
+            $value = (string) $value;
+        }
+
+        return str_replace(';', ',', $value);
+    }
+
+    private function isDefault(array $record)
+    {
+        return isset($record['default']) && $this->normaliseValue($record['default']) === 'true';
+    }
+
+    private function isDynamic(array $record)
+    {
+        return isset($record['dynamic']) && $this->normaliseValue($record['dynamic']) === 'true';
+    }
+
+    private function nextMatchedId(array $matched, $index, $count)
+    {
+        for ($position = $index + 1; $position < $count; $position++) {
+            if (isset($matched[$position]) && is_string($matched[$position]) && $matched[$position] !== '') {
+                return $matched[$position];
+            }
+        }
+
+        return null;
+    }
+
+    private function operationFailed($operation, $path, $id = null)
+    {
+        return $this->error($operation . ' failed ' . $path . ($id === null ? '' : ' ' . $id));
+    }
+
+    private function log($operation, $path, $id = null, $before = null)
+    {
+        $message = $operation . ' ' . $path;
+        if ($id !== null) {
+            $message .= ' ' . $id;
+        }
+        if ($before !== null) {
+            $message .= ' ' . $before;
+        }
+        $this->logs[] = $message;
     }
 }
