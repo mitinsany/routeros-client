@@ -18,6 +18,7 @@ docker compose run --rm php54 php tools/test.php
 docker compose run --rm composer --working-dir=/app/tools install
 docker compose run --rm php54 php tools/vendor/bin/phpcs --standard=phpcs.xml.dist
 docker compose run --rm php54 php tools/vendor/bin/phpcs --runtime-set installed_paths tools/vendor/phpcompatibility/php-compatibility --standard=phpcompatibility.xml.dist
+docker compose run --rm php80 php tools/vendor/bin/phpstan analyse src --configuration=phpstan.neon --no-progress
 ```
 
 The PHP 5.4 Docker run is mandatory for `php5`. PHP 7.2, PHP 7.0, and PHP 8.0

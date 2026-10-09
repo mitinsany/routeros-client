@@ -2,7 +2,13 @@
     "name": "mitinsany/routeros-client-tools",
     "type": "project",
     "require-dev": {
+        "phpstan/phpstan": "^2.2",
         "phpcompatibility/php-compatibility": "^9.3",
         "squizlabs/php_codesniffer": "^3.5"
+    },
+    "config": {
+        "platform": {
+            "php": "8.0.30"
+        }
     }
 }
