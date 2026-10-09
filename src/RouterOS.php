@@ -4,6 +4,9 @@ namespace MitinSany\RouterOS;
 
 use Exception;
 
+/**
+ * RouterOS command helpers built on the synchronous API client.
+ */
 class RouterOS extends Api
 {
     public $hostname;
@@ -12,6 +15,11 @@ class RouterOS extends Api
     private $callbacks = array();
     private $tagIndex = 1;
 
+    /**
+     * Sets the transport timeout in seconds.
+     *
+     * @return bool
+     */
     public function setTimeout($timeout = 5)
     {
         if ($this->transport === null) {
@@ -24,6 +32,11 @@ class RouterOS extends Api
         return true;
     }
 
+    /**
+     * Reads records using the RouterOS print command.
+     *
+     * @return array|false|string
+     */
     public function getAll($cmd, $proplist = false, $args = array(), $assoc = false, $callback = false)
     {
         $attributes = array();
@@ -52,21 +65,25 @@ class RouterOS extends Api
         return $records;
     }
 
+    /** @return bool|string */
     public function set($cmd, $args = array(), $callback = false)
     {
         return $this->mutate($this->commandPath($cmd, 'set'), $args, $callback);
     }
 
+    /** @return bool */
     public function reboot()
     {
         return $this->mutate('/system/reboot');
     }
 
+    /** @return bool|string */
     public function fetchUrl($url, $callback = false)
     {
         return $this->mutate('/tool/fetch', array('url' => $url), $callback);
     }
 
+    /** @return bool|string */
     public function cancel($tag = false, $callback = false)
     {
         $attributes = $tag === false ? array() : array('tag' => $tag);
@@ -74,6 +91,7 @@ class RouterOS extends Api
         return $this->mutate('/cancel', $attributes, $callback);
     }
 
+    /** @return bool|string */
     public function move($cmd, $id, $before, $callback = false)
     {
         return $this->mutate(
@@ -83,16 +101,19 @@ class RouterOS extends Api
         );
     }
 
+    /** @return bool|string */
     public function add($cmd, $args = array(), $callback = false)
     {
         return $this->mutate($this->commandPath($cmd, 'add'), $args, $callback);
     }
 
+    /** @return bool|string */
     public function remove($cmd, $id, $callback = false)
     {
         return $this->mutate($this->commandPath($cmd, 'remove'), array('.id' => $id), $callback);
     }
 
+    /** @return bool|string */
     public function unsetValue($cmd, $id, $value, $callback = false)
     {
         return $this->mutate(
@@ -102,6 +123,7 @@ class RouterOS extends Api
         );
     }
 
+    /** @return bool|string */
     public function scan($id, $duration = '00:10:00', $callback = false)
     {
         return $this->mutate(
@@ -111,6 +133,7 @@ class RouterOS extends Api
         );
     }
 
+    /** @return bool|string */
     public function frequencyMonitor($id, $duration = '00:02:00', $callback = false)
     {
         return $this->mutate(
@@ -120,6 +143,11 @@ class RouterOS extends Api
         );
     }
 
+    /**
+     * Starts a tagged listen request and returns its callback tag.
+     *
+     * @return string|false
+     */
     public function listen($cmd, $args = false, $callback = null)
     {
         if (!is_callable($callback)) {
@@ -129,6 +157,7 @@ class RouterOS extends Api
         return $this->request($this->commandPath($cmd, 'listen'), $args === false ? array() : $args, $callback);
     }
 
+    /** @return bool|string */
     public function bandwidthTest($address, $speed = '1M', $protocol = 'tcp', $callback = false)
     {
         return $this->mutate(
@@ -138,6 +167,11 @@ class RouterOS extends Api
         );
     }
 
+    /**
+     * Dispatches tagged asynchronous replies to their registered callbacks.
+     *
+     * @return bool
+     */
     public function dispatch(&$continue)
     {
         try {

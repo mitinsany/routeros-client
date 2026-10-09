@@ -2,6 +2,9 @@
 
 namespace MitinSany\RouterOS;
 
+/**
+ * Collects declarative RouterOS configuration entries and applies them to a client.
+ */
 class ConfigurationSynchronizer
 {
     public $vars = array();

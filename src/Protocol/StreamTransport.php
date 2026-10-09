@@ -4,10 +4,16 @@ namespace MitinSany\RouterOS\Protocol;
 
 use InvalidArgumentException;
 
+/**
+ * Reads and writes RouterOS sentences through a PHP stream resource.
+ */
 class StreamTransport
 {
     private $stream;
 
+    /**
+     * @param resource $stream Connected stream resource.
+     */
     public function __construct($stream)
     {
         if (!is_resource($stream)) {
@@ -17,6 +23,9 @@ class StreamTransport
         $this->stream = $stream;
     }
 
+    /**
+     * Writes a sentence and its terminating empty word.
+     */
     public function writeSentence(array $words)
     {
         foreach ($words as $word) {
@@ -26,6 +35,11 @@ class StreamTransport
         $this->writeAll(WordCodec::encodeLength(0));
     }
 
+    /**
+     * Reads one sentence up to its terminating empty word.
+     *
+     * @return array
+     */
     public function readSentence()
     {
         $words = array();
@@ -40,6 +54,9 @@ class StreamTransport
         }
     }
 
+    /**
+     * Sets the stream timeout in seconds.
+     */
     public function setTimeout($seconds)
     {
         $this->ensureOpen();
@@ -49,6 +66,9 @@ class StreamTransport
         }
     }
 
+    /**
+     * Closes the underlying stream resource.
+     */
     public function close()
     {
         if (is_resource($this->stream)) {

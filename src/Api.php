@@ -6,6 +6,9 @@ use Exception;
 use MitinSany\RouterOS\Protocol\StreamTransport;
 use MitinSany\RouterOS\Protocol\WordCodec;
 
+/**
+ * Synchronous RouterOS API client using the native word protocol.
+ */
 class Api
 {
     public $debug = false;
@@ -20,6 +23,11 @@ class Api
 
     protected $transport;
 
+    /**
+     * Opens a connection and authenticates with a plain-text RouterOS login.
+     *
+     * @return bool True after a !done reply.
+     */
     public function connect($ip, $login, $password)
     {
         $this->connected = false;
@@ -52,6 +60,9 @@ class Api
         return false;
     }
 
+    /**
+     * Emits a diagnostic message when debugging is enabled.
+     */
     public function debug($text)
     {
         if ($this->debug) {
@@ -59,6 +70,9 @@ class Api
         }
     }
 
+    /**
+     * Writes one RouterOS sentence.
+     */
     public function write($command, $param2 = true)
     {
         if (is_array($command)) {
@@ -72,11 +86,21 @@ class Api
         $this->getTransport()->writeSentence($words);
     }
 
+    /**
+     * Encodes a RouterOS word length.
+     *
+     * @return string Binary length prefix.
+     */
     public function encodeLength($length)
     {
         return WordCodec::encodeLength($length);
     }
 
+    /**
+     * Reads response sentences through !done or !trap.
+     *
+     * @return array|false Parsed records or raw sentences when disabled.
+     */
     public function read($parse = true)
     {
         $responses = array();
@@ -97,6 +121,11 @@ class Api
         return $this->parseResponse($responses);
     }
 
+    /**
+     * Converts !re sentences to attribute records and handles RouterOS errors.
+     *
+     * @return array|false
+     */
     public function parseResponse($response)
     {
         if (empty($response)) {
@@ -128,6 +157,9 @@ class Api
         return $records;
     }
 
+    /**
+     * Closes the active RouterOS transport.
+     */
     public function disconnect()
     {
         if ($this->transport !== null) {
@@ -139,16 +171,31 @@ class Api
         $this->connected = false;
     }
 
+    /**
+     * Compatibility-named response parser for template consumers.
+     *
+     * @return array|false
+     */
     public function parseResponseForSmarty($response)
     {
         return $this->parseResponse($response);
     }
 
+    /**
+     * Returns the supplied array without changing its key structure.
+     *
+     * @return array
+     */
     public function changeArrayKeyName(&$array)
     {
         return $array;
     }
 
+    /**
+     * Sends a command with key/value attributes.
+     *
+     * @return array|false
+     */
     public function command($com, $arr = array())
     {
         $words = array($com);
