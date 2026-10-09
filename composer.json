@@ -28,8 +28,8 @@
         }
     },
     "scripts": {
-        "test": "phpunit --configuration phpunit.xml.dist",
-        "lint": "phpcs --standard=phpcs.xml.dist",
-        "compatibility": "phpcs --runtime-set installed_paths vendor/phpcompatibility/php-compatibility --standard=phpcompatibility.xml.dist"
+        "test": "@php tools/test.php",
+        "lint": "@php tools/vendor/bin/phpcs --standard=phpcs.xml.dist",
+        "compatibility": "@php tools/vendor/bin/phpcs --runtime-set installed_paths tools/vendor/phpcompatibility/php-compatibility --standard=phpcompatibility.xml.dist"
     }
 }

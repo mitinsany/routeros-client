@@ -7,4 +7,7 @@ The library exposes the `MitinSany\RouterOS` namespace.
 
 The supported public surface is recorded in
 [docs/public-contract.md](docs/public-contract.md). Protocol behavior and
-command helpers will be added test-first in subsequent commits.
+command helpers are covered by isolated tests.
+
+See [docs/branching.md](docs/branching.md) for Docker verification commands
+and the PHP branch policy.

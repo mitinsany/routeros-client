@@ -1,0 +1,28 @@
+services:
+  composer:
+    image: composer:2.2
+    volumes:
+      - .:/app
+    working_dir: /app
+  php54:
+    build:
+      context: .
+      dockerfile: docker/php54/Dockerfile
+    volumes:
+      - .:/app
+    working_dir: /app
+  php70:
+    image: routeros-client-php70:latest
+    volumes:
+      - .:/app
+    working_dir: /app
+  php72:
+    image: routeros-client-php72:latest
+    volumes:
+      - .:/app
+    working_dir: /app
+  php80:
+    image: routeros-client-php80:latest
+    volumes:
+      - .:/app
+    working_dir: /app

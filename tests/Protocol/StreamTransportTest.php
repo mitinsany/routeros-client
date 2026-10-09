@@ -30,11 +30,15 @@ class StreamTransportTest extends TestCase
 
     public function testReadSentenceRejectsAnIncompleteWord()
     {
-        $this->setExpectedException('MitinSany\\RouterOS\\Protocol\\TransportException');
-
         $stream = MemoryStream::open("\x04ab", 2);
         $transport = new StreamTransport($stream);
-        $transport->readSentence();
+
+        try {
+            $transport->readSentence();
+            $this->fail('An incomplete word must raise a transport exception.');
+        } catch (TransportException $exception) {
+            $this->assertInstanceOf('MitinSany\\RouterOS\\Protocol\\TransportException', $exception);
+        }
     }
 
     public function testReadSentenceRejectsSocketTimeout()
@@ -46,9 +50,13 @@ class StreamTransportTest extends TestCase
         $pair = stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP);
         stream_set_timeout($pair[0], 0, 1000);
 
-        $this->setExpectedException('MitinSany\\RouterOS\\Protocol\\TransportException');
-
         $transport = new StreamTransport($pair[0]);
-        $transport->readSentence();
+
+        try {
+            $transport->readSentence();
+            $this->fail('A timed out socket must raise a transport exception.');
+        } catch (TransportException $exception) {
+            $this->assertInstanceOf('MitinSany\\RouterOS\\Protocol\\TransportException', $exception);
+        }
     }
 }
