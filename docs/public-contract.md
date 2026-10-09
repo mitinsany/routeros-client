@@ -46,3 +46,13 @@ Public methods: `variable()`, `configureWithArguments()`,
 `passWithArguments()`, `parseFile()`, `replace()`, `error()`, `define()`,
 `config()`, `cmd()`, `ignore()`, `pass()`, `section()`, `call()`, `update()`,
 and `updateSection()`. It also supports PHP property magic methods.
+
+Configuration text is line-oriented. Blank lines and `#` comments are ignored.
+`define key value` stores a variable; `config /path key=value ...` adds a
+configuration entry; `ignore /path key=value ...` excludes matching entries;
+and `pass /path key=value ...` permits only matching entries when pass rules
+exist for that path. Values may contain `{{variable}}` placeholders. `update()`
+calls `set($path, $attributes)` on its router argument in configuration order.
+`section($alias, $path, $type)` registers a path and `updateSection()` applies
+only entries for that path. Parsing or connection failure returns `false` and
+appends a message to `logs`.
