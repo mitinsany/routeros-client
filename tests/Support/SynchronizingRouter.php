@@ -4,32 +4,32 @@ namespace MitinSany\RouterOS\Tests\Support;
 
 class SynchronizingRouter
 {
-    public $responses = array();
-    public $records = array();
-    public $failures = array();
+    public $responses = [];
+    public $records = [];
+    public $failures = [];
     private $nextId = 1;
 
-    public function getAll($path, $properties = false, $arguments = array())
+    public function getAll($path, $properties = false, $arguments = [])
     {
-        $this->records[] = array('getAll', $path, $properties, $arguments);
+        $this->records[] = ['getAll', $path, $properties, $arguments];
 
         if (isset($this->failures['getAll'])) {
             return false;
         }
 
-        return array_key_exists($path, $this->responses) ? $this->responses[$path] : array();
+        return array_key_exists($path, $this->responses) ? $this->responses[$path] : [];
     }
 
-    public function set($path, $attributes = array())
+    public function set($path, $attributes = [])
     {
-        $this->records[] = array('set', $path, $attributes);
+        $this->records[] = ['set', $path, $attributes];
 
         return !isset($this->failures['set']);
     }
 
-    public function add($path, $attributes = array())
+    public function add($path, $attributes = [])
     {
-        $this->records[] = array('add', $path, $attributes);
+        $this->records[] = ['add', $path, $attributes];
 
         if (isset($this->failures['add'])) {
             return false;
@@ -40,21 +40,21 @@ class SynchronizingRouter
 
     public function remove($path, $id)
     {
-        $this->records[] = array('remove', $path, $id);
+        $this->records[] = ['remove', $path, $id];
 
         return !isset($this->failures['remove']);
     }
 
     public function move($path, $id, $before)
     {
-        $this->records[] = array('move', $path, $id, $before);
+        $this->records[] = ['move', $path, $id, $before];
 
         return !isset($this->failures['move']);
     }
 
     public function mutatingRecords()
     {
-        $records = array();
+        $records = [];
         foreach ($this->records as $record) {
             if ($record[0] !== 'getAll') {
                 $records[] = $record;

@@ -14,7 +14,7 @@ class StreamTransportTest extends TestCase
         $stream = MemoryStream::open('', 2);
         $transport = new StreamTransport($stream);
 
-        $transport->writeSentence(array('/interface/print', '=name=ether1'));
+        $transport->writeSentence(['/interface/print', '=name=ether1']);
         rewind($stream);
 
         $this->assertSame("\x10/interface/print\x0c=name=ether1\x00", stream_get_contents($stream));
@@ -25,7 +25,7 @@ class StreamTransportTest extends TestCase
         $stream = MemoryStream::open("\x03!re\x0c=name=ether1\x00", 1);
         $transport = new StreamTransport($stream);
 
-        $this->assertSame(array('!re', '=name=ether1'), $transport->readSentence());
+        $this->assertSame(['!re', '=name=ether1'], $transport->readSentence());
     }
 
     public function testReadSentenceRejectsAnIncompleteWord()

@@ -22,12 +22,12 @@ class ConfigurationSynchronizerTest extends TestCase
     {
         $synchronizer = new ConfigurationSynchronizer();
         $synchronizer->define('router', 'edge');
-        $synchronizer->config('/queue/simple', array('name' => '{{router}}', 'comment' => 'managed'));
+        $synchronizer->config('/queue/simple', ['name' => '{{router}}', 'comment' => 'managed']);
         $router = new RecordingRouter();
 
         $this->assertTrue($synchronizer->update($router));
         $this->assertSame(
-            array(array('/queue/simple', array('name' => 'edge', 'comment' => 'managed'))),
+            [['/queue/simple', ['name' => 'edge', 'comment' => 'managed']]],
             $router->sets
         );
     }
@@ -35,23 +35,23 @@ class ConfigurationSynchronizerTest extends TestCase
     public function testIgnoreSkipsMatchingConfiguration()
     {
         $synchronizer = new ConfigurationSynchronizer();
-        $synchronizer->config('/queue/simple', array('name' => 'skip'));
-        $synchronizer->ignore('/queue/simple', array('name' => 'skip'));
+        $synchronizer->config('/queue/simple', ['name' => 'skip']);
+        $synchronizer->ignore('/queue/simple', ['name' => 'skip']);
         $router = new RecordingRouter();
 
         $this->assertTrue($synchronizer->update($router));
-        $this->assertSame(array(), $router->sets);
+        $this->assertSame([], $router->sets);
     }
 
     public function testPassRulesExcludeConfigurationThatDoesNotMatch()
     {
         $synchronizer = new ConfigurationSynchronizer();
-        $synchronizer->config('/queue/simple', array('name' => 'edge', 'comment' => 'manual'));
-        $synchronizer->pass('/queue/simple', array('comment' => 'managed'));
+        $synchronizer->config('/queue/simple', ['name' => 'edge', 'comment' => 'manual']);
+        $synchronizer->pass('/queue/simple', ['comment' => 'managed']);
         $router = new RecordingRouter();
 
         $this->assertTrue($synchronizer->update($router));
-        $this->assertSame(array(), $router->sets);
+        $this->assertSame([], $router->sets);
     }
 
     public function testParseFileLoadsIndependentConfigurationGrammar()
@@ -62,7 +62,7 @@ class ConfigurationSynchronizerTest extends TestCase
         $this->assertTrue($synchronizer->parseFile(__DIR__ . '/fixtures/synchronizer.conf'));
         $this->assertTrue($synchronizer->update($router));
         $this->assertSame(
-            array(array('/queue/simple', array('name' => 'edge', 'comment' => 'managed'))),
+            [['/queue/simple', ['name' => 'edge', 'comment' => 'managed']]],
             $router->sets
         );
     }
@@ -71,14 +71,14 @@ class ConfigurationSynchronizerTest extends TestCase
     {
         $synchronizer = new ConfigurationSynchronizer();
         $synchronizer->section('queues', '/queue/simple', 'set', 'name');
-        $synchronizer->config('/queue/simple', array('name' => 'edge'));
-        $synchronizer->config('/ip/address', array('address' => '192.0.2.1/24'));
+        $synchronizer->config('/queue/simple', ['name' => 'edge']);
+        $synchronizer->config('/ip/address', ['address' => '192.0.2.1/24']);
         $router = new RecordingRouter();
-        $router->responses['/queue/simple'] = array(
-            array('.id' => '*1', 'name' => 'edge', 'comment' => 'old')
-        );
+        $router->responses['/queue/simple'] = [
+            ['.id' => '*1', 'name' => 'edge', 'comment' => 'old']
+        ];
 
         $this->assertTrue($synchronizer->updateSection($router, 'queues'));
-        $this->assertSame(array(), $router->sets);
+        $this->assertSame([], $router->sets);
     }
 }

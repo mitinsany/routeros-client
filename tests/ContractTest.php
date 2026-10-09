@@ -10,36 +10,36 @@ class ContractTest extends TestCase
     {
         $this->assertClassContract(
             'MitinSany\\RouterOS\\Api',
-            array(
+            [
                 'debug', 'errorNo', 'errorString', 'attempts', 'connected', 'delay',
                 'port', 'timeout', 'sock'
-            ),
-            array(
+            ],
+            [
                 'connect', 'debug', 'write', 'encodeLength', 'read', 'parseResponse',
                 'disconnect', 'parseResponseForSmarty', 'changeArrayKeyName', 'command'
-            )
+            ]
         );
 
         $this->assertClassContract(
             'MitinSany\\RouterOS\\RouterOS',
-            array('sock', 'hostname', 'readOnly'),
-            array(
+            ['sock', 'hostname', 'readOnly'],
+            [
                 'setTimeout', 'getAll', 'set', 'reboot', 'fetchUrl', 'cancel', 'move',
                 'add', 'remove', 'unsetValue', 'scan', 'frequencyMonitor', 'listen',
                 'bandwidthTest', 'dispatch'
-            )
+            ]
         );
 
         $this->assertClassContract(
             'MitinSany\\RouterOS\\ConfigurationSynchronizer',
-            array('vars', 'logs', 'showIgnored', 'currentContext'),
-            array(
+            ['vars', 'logs', 'showIgnored', 'currentContext'],
+            [
                 '__get', '__set', '__isset', '__unset', 'variable',
                 'configureWithArguments', 'configureReversedWithArguments',
                 'ignoreWithArguments', 'passWithArguments', 'parseFile', 'replace',
                 'error', 'define', 'config', 'cmd', 'ignore', 'pass', 'section', 'call',
                 'update', 'updateSection'
-            )
+            ]
         );
     }
 

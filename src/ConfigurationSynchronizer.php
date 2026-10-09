@@ -7,16 +7,16 @@ namespace MitinSany\RouterOS;
  */
 class ConfigurationSynchronizer
 {
-    public $vars = array();
-    public $logs = array();
+    public $vars = [];
+    public $logs = [];
     public $showIgnored = false;
     public $currentContext = '--internal--';
 
-    private $configurations = array();
-    private $ignoreRules = array();
-    private $passRules = array();
-    private $sections = array();
-    private $commands = array();
+    private $configurations = [];
+    private $ignoreRules = [];
+    private $passRules = [];
+    private $sections = [];
+    private $commands = [];
 
     public function __get($name)
     {
@@ -164,7 +164,7 @@ class ConfigurationSynchronizer
 
         $key = $this->referenceKey($reference);
         if (!isset($this->configurations[$key])) {
-            $this->configurations[$key] = array();
+            $this->configurations[$key] = [];
         }
 
         if ($reverse) {
@@ -195,22 +195,22 @@ class ConfigurationSynchronizer
 
     public function section($alias, $path, $type, $keys = false, $defaults = false)
     {
-        $allowedTypes = array('value', 'set', 'addset', 'addset_order');
+        $allowedTypes = ['value', 'set', 'addset', 'addset_order'];
         if (!in_array($type, $allowedTypes, true)) {
             return $this->error('Unknown configuration section type: ' . $type);
         }
 
-        $normalisedDefaults = $this->normaliseAttributes($defaults === false ? array() : $defaults);
+        $normalisedDefaults = $this->normaliseAttributes($defaults === false ? [] : $defaults);
         if ($normalisedDefaults === false) {
             return $this->error('Section defaults must be an array.');
         }
 
-        $this->sections[$alias] = array(
+        $this->sections[$alias] = [
             'path' => $path,
             'type' => $type,
             'keys' => $this->normaliseKeys($keys),
             'defaults' => $normalisedDefaults
-        );
+        ];
 
         return true;
     }
@@ -226,7 +226,7 @@ class ConfigurationSynchronizer
 
     public function update($conn, $ret = false)
     {
-        $this->logs = array();
+        $this->logs = [];
 
         foreach ($this->sections as $alias => $section) {
             if (!$this->updateSection($conn, $alias)) {
@@ -301,7 +301,7 @@ class ConfigurationSynchronizer
             return $this->error('RouterOS connection must provide set().');
         }
 
-        $desired = array();
+        $desired = [];
         foreach ($this->sectionConfigurations($alias) as $configuration) {
             $configuration = $this->desiredAttributes($section, $configuration);
             if ($this->isIgnored($alias, $configuration)) {
@@ -343,7 +343,7 @@ class ConfigurationSynchronizer
             return $this->error('RouterOS connection must provide set().');
         }
 
-        $desired = array();
+        $desired = [];
         foreach ($this->sectionConfigurations($alias) as $configuration) {
             $configuration = $this->desiredAttributes($section, $configuration);
             if ($this->isIgnored($alias, $configuration)) {
@@ -357,8 +357,8 @@ class ConfigurationSynchronizer
             $desired[] = $configuration;
         }
 
-        $matched = array();
-        $currentOrder = array();
+        $matched = [];
+        $currentOrder = [];
         foreach ($current as $record) {
             $id = isset($record['.id']) ? $record['.id'] : null;
             if ($this->isIgnored($alias, $record)) {
@@ -449,7 +449,7 @@ class ConfigurationSynchronizer
         }
 
         ksort($matched);
-        $desiredOrder = array();
+        $desiredOrder = [];
         foreach ($matched as $id) {
             if (is_string($id) && $id !== '') {
                 $desiredOrder[] = $id;
@@ -469,7 +469,7 @@ class ConfigurationSynchronizer
                 return $this->operationFailed('move', $path, $id);
             }
             array_splice($currentOrder, $found, 1);
-            array_splice($currentOrder, $position, 0, array($id));
+            array_splice($currentOrder, $position, 0, [$id]);
             $this->log('move', $path, $id, $before);
         }
 
@@ -534,7 +534,7 @@ class ConfigurationSynchronizer
 
     private function changes(array $current, array $desired)
     {
-        $changes = array();
+        $changes = [];
         foreach ($desired as $key => $value) {
             if (!array_key_exists($key, $current) || !$this->valuesEquivalent($current[$key], $value)) {
                 $changes[$key] = $value;
@@ -551,7 +551,7 @@ class ConfigurationSynchronizer
 
     private function sectionConfigurations($alias)
     {
-        return isset($this->configurations[$alias]) ? $this->configurations[$alias] : array();
+        return isset($this->configurations[$alias]) ? $this->configurations[$alias] : [];
     }
 
     private function referenceKey($reference)
@@ -583,7 +583,7 @@ class ConfigurationSynchronizer
     private function normaliseKeys($keys)
     {
         if ($keys === false || $keys === null || $keys === '') {
-            return array();
+            return [];
         }
         if (is_array($keys)) {
             return array_values($keys);
@@ -595,13 +595,13 @@ class ConfigurationSynchronizer
     private function normaliseAttributes($attributes)
     {
         if ($attributes === false) {
-            return array();
+            return [];
         }
         if (!is_array($attributes)) {
             return false;
         }
 
-        $normalised = array();
+        $normalised = [];
         foreach ($attributes as $key => $value) {
             if (is_int($key) && is_string($value)) {
                 $pair = explode('=', $value, 2);
@@ -620,11 +620,11 @@ class ConfigurationSynchronizer
     private function normaliseRecords($records)
     {
         if (!is_array($records) || count($records) === 0) {
-            return array();
+            return [];
         }
         $first = reset($records);
         if (!is_array($first)) {
-            return array($records);
+            return [$records];
         }
 
         return $records;
@@ -632,7 +632,7 @@ class ConfigurationSynchronizer
 
     private function parseAttributes(array $parts, $lineNumber)
     {
-        $attributes = array();
+        $attributes = [];
         foreach ($parts as $part) {
             $pair = explode('=', $part, 2);
             if (count($pair) !== 2 || $pair[0] === '') {
@@ -653,7 +653,7 @@ class ConfigurationSynchronizer
             return $this->error('Rule attributes must be an array.');
         }
         if (!isset($rules[$key])) {
-            $rules[$key] = array();
+            $rules[$key] = [];
         }
         $rules[$key][] = $attributes;
 

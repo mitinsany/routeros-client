@@ -13,33 +13,33 @@ class CommandsTest extends TestCase
      */
     public function testHelpersUseExpectedRouterOsCommand($method, $arguments, $expected)
     {
-        $transport = new ScriptedTransport(array(array('!done')));
+        $transport = new ScriptedTransport([['!done']]);
         $router = new TestRouterOS($transport);
 
-        $this->assertTrue(call_user_func_array(array($router, $method), $arguments));
-        $this->assertSame(array($expected), $transport->sentences);
+        $this->assertTrue(call_user_func_array([$router, $method], $arguments));
+        $this->assertSame([$expected], $transport->sentences);
     }
 
     public function helperCommandProvider()
     {
-        return array(
-            array('reboot', array(), array('/system/reboot')),
-            array(
+        return [
+            ['reboot', [], ['/system/reboot']],
+            [
                 'fetchUrl',
-                array('https://example.invalid/file'),
-                array('/tool/fetch', '=url=https://example.invalid/file')
-            ),
-            array('scan', array('wlan1'), array('/interface/wireless/scan', '=interface=wlan1', '=duration=00:10:00')),
-            array(
+                ['https://example.invalid/file'],
+                ['/tool/fetch', '=url=https://example.invalid/file']
+            ],
+            ['scan', ['wlan1'], ['/interface/wireless/scan', '=interface=wlan1', '=duration=00:10:00']],
+            [
                 'frequencyMonitor',
-                array('wlan1'),
-                array('/interface/wireless/frequency-monitor', '=interface=wlan1', '=duration=00:02:00')
-            ),
-            array(
+                ['wlan1'],
+                ['/interface/wireless/frequency-monitor', '=interface=wlan1', '=duration=00:02:00']
+            ],
+            [
                 'bandwidthTest',
-                array('198.51.100.1'),
-                array('/tool/bandwidth-test', '=address=198.51.100.1', '=speed=1M', '=protocol=tcp')
-            )
-        );
+                ['198.51.100.1'],
+                ['/tool/bandwidth-test', '=address=198.51.100.1', '=speed=1M', '=protocol=tcp']
+            ]
+        ];
     }
 }
