@@ -8,7 +8,7 @@ use MitinSany\RouterOS\Protocol\TransportException;
 
 class ScriptedTransport
 {
-    public $sentences = array();
+    public $sentences = [];
     public $timeout;
     public $closed = false;
 

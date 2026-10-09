@@ -14,7 +14,7 @@ class RouterOS extends Api
     public $hostname;
     public $readOnly = false;
 
-    private $callbacks = array();
+    private $callbacks = [];
     private $tagIndex = 1;
 
     /**
@@ -39,9 +39,9 @@ class RouterOS extends Api
      *
      * @return array|false|string
      */
-    public function getAll($cmd, $proplist = false, $args = array(), $assoc = false, $callback = false)
+    public function getAll($cmd, $proplist = false, $args = [], $assoc = false, $callback = false)
     {
-        $attributes = array();
+        $attributes = [];
         if ($proplist !== false) {
             $attributes['.proplist'] = is_array($proplist) ? implode(',', $proplist) : $proplist;
         }
@@ -55,7 +55,7 @@ class RouterOS extends Api
             return $result;
         }
 
-        $records = array();
+        $records = [];
         foreach ($result as $record) {
             if (isset($record['.id'])) {
                 $records[$record['.id']] = $record;
@@ -68,7 +68,7 @@ class RouterOS extends Api
     }
 
     /** @return bool|string */
-    public function set($cmd, $args = array(), $callback = false)
+    public function set($cmd, $args = [], $callback = false)
     {
         return $this->mutate($this->commandPath($cmd, 'set'), $args, $callback);
     }
@@ -82,13 +82,13 @@ class RouterOS extends Api
     /** @return bool|string */
     public function fetchUrl($url, $callback = false)
     {
-        return $this->mutate('/tool/fetch', array('url' => $url), $callback);
+        return $this->mutate('/tool/fetch', ['url' => $url], $callback);
     }
 
     /** @return bool|string */
     public function cancel($tag = false, $callback = false)
     {
-        $attributes = $tag === false ? array() : array('tag' => $tag);
+        $attributes = $tag === false ? [] : ['tag' => $tag];
 
         return $this->mutate('/cancel', $attributes, $callback);
     }
@@ -98,13 +98,13 @@ class RouterOS extends Api
     {
         return $this->mutate(
             $this->commandPath($cmd, 'move'),
-            array('.id' => $id, 'destination' => $before),
+            ['.id' => $id, 'destination' => $before],
             $callback
         );
     }
 
     /** @return bool|string */
-    public function add($cmd, $args = array(), $callback = false)
+    public function add($cmd, $args = [], $callback = false)
     {
         return $this->mutate($this->commandPath($cmd, 'add'), $args, $callback);
     }
@@ -112,7 +112,7 @@ class RouterOS extends Api
     /** @return bool|string */
     public function remove($cmd, $id, $callback = false)
     {
-        return $this->mutate($this->commandPath($cmd, 'remove'), array('.id' => $id), $callback);
+        return $this->mutate($this->commandPath($cmd, 'remove'), ['.id' => $id], $callback);
     }
 
     /** @return bool|string */
@@ -120,7 +120,7 @@ class RouterOS extends Api
     {
         return $this->mutate(
             $this->commandPath($cmd, 'unset'),
-            array('.id' => $id, 'value' => $value),
+            ['.id' => $id, 'value' => $value],
             $callback
         );
     }
@@ -130,7 +130,7 @@ class RouterOS extends Api
     {
         return $this->mutate(
             '/interface/wireless/scan',
-            array('interface' => $id, 'duration' => $duration),
+            ['interface' => $id, 'duration' => $duration],
             $callback
         );
     }
@@ -140,7 +140,7 @@ class RouterOS extends Api
     {
         return $this->mutate(
             '/interface/wireless/frequency-monitor',
-            array('interface' => $id, 'duration' => $duration),
+            ['interface' => $id, 'duration' => $duration],
             $callback
         );
     }
@@ -156,7 +156,7 @@ class RouterOS extends Api
             return false;
         }
 
-        return $this->request($this->commandPath($cmd, 'listen'), $args === false ? array() : $args, $callback);
+        return $this->request($this->commandPath($cmd, 'listen'), $args === false ? [] : $args, $callback);
     }
 
     /** @return bool|string */
@@ -164,7 +164,7 @@ class RouterOS extends Api
     {
         return $this->mutate(
             '/tool/bandwidth-test',
-            array('address' => $address, 'speed' => $speed, 'protocol' => $protocol),
+            ['address' => $address, 'speed' => $speed, 'protocol' => $protocol],
             $callback
         );
     }
@@ -209,7 +209,7 @@ class RouterOS extends Api
         return true;
     }
 
-    private function mutate($path, array $attributes = array(), $callback = false)
+    private function mutate($path, array $attributes = [], $callback = false)
     {
         if ($this->readOnly) {
             return false;
@@ -225,7 +225,7 @@ class RouterOS extends Api
 
     private function request($path, array $attributes, $callback)
     {
-        $words = array($path);
+        $words = [$path];
         foreach ($attributes as $key => $value) {
             $words[] = '=' . $key . '=' . $value;
         }
@@ -278,7 +278,7 @@ class RouterOS extends Api
 
     private function attributesFromSentence(array $sentence)
     {
-        $attributes = array();
+        $attributes = [];
         foreach ($sentence as $word) {
             if (substr($word, 0, 1) !== '=') {
                 continue;
