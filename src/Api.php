@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MitinSany\RouterOS;
 
 use Exception;
+use MitinSany\RouterOS\Enum\LoginMode;
 use MitinSany\RouterOS\Protocol\StreamTransport;
 use MitinSany\RouterOS\Protocol\WordCodec;
 
@@ -26,11 +27,11 @@ class Api
     protected $transport;
 
     /**
-     * Opens a connection and authenticates with a plain-text RouterOS login.
+     * Opens a connection and authenticates with a RouterOS login mode.
      *
      * @return bool True after a !done reply.
      */
-    public function connect($ip, $login, $password)
+    public function connect($ip, $login, $password, $loginMode = LoginMode::AUTO)
     {
         $this->connected = false;
         $this->errorNo = null;
@@ -43,18 +44,11 @@ class Api
             }
 
             $this->transport->setTimeout($this->timeout);
-            $this->write(['/login', '=name=' . $login, '=password=' . $password]);
-            $response = $this->read(false);
-
-            if ($this->hasResponseType($response, '!trap') || $this->hasResponseType($response, '!fatal')) {
-                $this->setErrorFromResponse($response);
-            } elseif ($this->hasResponseType($response, '!done')) {
+            if ($this->authenticate($login, $password, $loginMode)) {
                 $this->connected = true;
 
                 return true;
             }
-
-            $this->setErrorFromResponse($response);
         } catch (Exception $exception) {
             $this->errorString = $exception->getMessage();
         }
@@ -226,6 +220,134 @@ class Api
         }
 
         return new StreamTransport($this->sock);
+    }
+
+    private function authenticate($login, $password, $loginMode)
+    {
+        if ($loginMode === LoginMode::PLAIN) {
+            return $this->authenticatePlain($login, $password);
+        }
+        if ($loginMode === LoginMode::LEGACY) {
+            return $this->authenticateLegacy($login, $password);
+        }
+        if ($loginMode === LoginMode::AUTO) {
+            return $this->authenticateAuto($login, $password);
+        }
+
+        $this->errorString = 'Unknown RouterOS login mode.';
+
+        return false;
+    }
+
+    private function authenticatePlain($login, $password)
+    {
+        $response = $this->sendLogin(['=name=' . $login, '=password=' . $password]);
+        if (!$this->isSuccessfulLoginResponse($response)) {
+            return false;
+        }
+        if ($this->loginChallenge($response) !== null) {
+            $this->errorString = 'RouterOS requires legacy login.';
+
+            return false;
+        }
+
+        return true;
+    }
+
+    private function authenticateLegacy($login, $password)
+    {
+        $response = $this->sendLogin([]);
+        if (!$this->isSuccessfulLoginResponse($response)) {
+            return false;
+        }
+
+        $challenge = $this->loginChallenge($response);
+        if (!$this->isValidLegacyChallenge($challenge)) {
+            $this->errorString = 'RouterOS did not provide a valid legacy login challenge.';
+
+            return false;
+        }
+
+        return $this->sendLegacyResponse($login, $password, $challenge);
+    }
+
+    private function authenticateAuto($login, $password)
+    {
+        $response = $this->sendLogin(['=name=' . $login, '=password=' . $password]);
+        if (!$this->isSuccessfulLoginResponse($response)) {
+            return false;
+        }
+
+        $challenge = $this->loginChallenge($response);
+        if ($challenge === null) {
+            return true;
+        }
+        if (!$this->isValidLegacyChallenge($challenge)) {
+            $this->errorString = 'RouterOS returned an invalid legacy login challenge.';
+
+            return false;
+        }
+
+        return $this->sendLegacyResponse($login, $password, $challenge);
+    }
+
+    private function sendLegacyResponse($login, $password, $challenge)
+    {
+        $response = '00' . md5(chr(0) . $password . pack('H*', $challenge));
+
+        return $this->isSuccessfulLoginResponse($this->sendLogin([
+            '=name=' . $login,
+            '=response=' . $response
+        ]));
+    }
+
+    private function sendLogin(array $words)
+    {
+        array_unshift($words, '/login');
+        $this->write($words);
+
+        return $this->read(false);
+    }
+
+    private function isSuccessfulLoginResponse($response)
+    {
+        if (!is_array($response)) {
+            $this->errorString = 'RouterOS login did not return a valid response.';
+
+            return false;
+        }
+        if ($this->hasResponseType($response, '!trap') || $this->hasResponseType($response, '!fatal')) {
+            $this->setErrorFromResponse($response);
+
+            return false;
+        }
+        if ($this->hasResponseType($response, '!done')) {
+            return true;
+        }
+
+        $this->errorString = 'RouterOS login did not complete.';
+
+        return false;
+    }
+
+    private function loginChallenge(array $response)
+    {
+        foreach ($response as $sentence) {
+            if (!$this->sentenceHasType($sentence, '!done')) {
+                continue;
+            }
+            $attributes = $this->parseAttributes($sentence);
+            if (array_key_exists('ret', $attributes)) {
+                return $attributes['ret'];
+            }
+        }
+
+        return null;
+    }
+
+    private function isValidLegacyChallenge($challenge)
+    {
+        return is_string($challenge) && preg_match('/^[a-f0-9]{32}$/iD', $challenge) === 1;
     }
 
     private function getTransport()

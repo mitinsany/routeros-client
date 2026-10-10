@@ -12,10 +12,14 @@ Public methods: `connect()`, `debug()`, `write()`, `encodeLength()`, `read()`,
 `parseResponse()`, `disconnect()`, `parseResponseForSmarty()`,
 `changeArrayKeyName()`, and `command()`.
 
-`connect($host, $user, $password)` sends RouterOS plain-text `/login` and
-returns `true` only after `!done`; it returns `false` for a trap, transport
-error, or unsuccessful connection, setting `errorString` when a message is
-available. `command($path, $attributes)` writes `=key=value` attributes and
+`connect($host, $user, $password, $loginMode)` accepts the optional values
+`LoginMode::AUTO`, `LoginMode::PLAIN`, and `LoginMode::LEGACY`; omitted mode
+means `AUTO`. `PLAIN` sends one modern name/password request. `LEGACY` obtains
+a RouterOS MD5 challenge and sends the corresponding response. `AUTO` first
+sends the modern request, then uses the same connection for a legacy response
+only when RouterOS returns a valid challenge. It returns `false` for a trap,
+transport error, invalid challenge, or unsuccessful connection, setting
+`errorString` when a message is available. `command($path, $attributes)` writes `=key=value` attributes and
 returns an array of `!re` records; it returns `false` after `!trap` or a
 transport failure. Attribute values preserve embedded equal signs. `read()`
 stops after `!done` or `!trap`; with its default argument it returns parsed
