@@ -30,7 +30,8 @@ Public methods: `setTimeout()`, `getAll()`, `set()`, `reboot()`, `fetchUrl()`,
 `frequencyMonitor()`, `listen()`, `bandwidthTest()`, and `dispatch()`.
 
 `getAll($path)` reads `!re` records from `$path/print` and returns `false` on
-`!trap`. Mutating helpers return `true` after `!done`, `false` after a trap or
+`!trap`. Its optional final `$queryWords` array is emitted unchanged after
+attributes, preserving RouterOS query-word order. Mutating helpers return `true` after `!done`, `false` after a trap or
 when `readOnly` is true, and a callback tag when passed a callback. `listen()`
 always requires a callback and returns its tag. `dispatch(&$continue)` calls
 callbacks as `($router, $success, $reply)`; an `!re` reply has `true` and an
@@ -44,7 +45,7 @@ Public properties: `vars`, `logs`, `showIgnored`, and `currentContext`.
 Public methods: `variable()`, `configureWithArguments()`,
 `configureReversedWithArguments()`, `ignoreWithArguments()`,
 `passWithArguments()`, `parseFile()`, `replace()`, `error()`, `define()`,
-`config()`, `cmd()`, `ignore()`, `pass()`, `section()`, `call()`, `update()`,
+`config()`, `cmd()`, `ignore()`, `pass()`, `section()`, `readOptions()`, `call()`, `update()`,
 and `updateSection()`. It also supports PHP property magic methods.
 
 Configuration text is line-oriented. Blank lines and `#` comments are ignored.
@@ -53,6 +54,8 @@ configuration entry; `ignore /path key=value ...` excludes matching entries;
 and `pass /path key=value ...` permits only matching entries when pass rules
 exist for that path. Values may contain `{{variable}}` placeholders. `update()`
 calls `set($path, $attributes)` on its router argument in configuration order.
-`section($alias, $path, $type)` registers a path and `updateSection()` applies
+`section($alias, $path, $type)` registers a path. `readOptions()` optionally
+sets the print `.proplist` and ordered query words for that section; without it,
+the synchronizer keeps using `getAll($path)`. `updateSection()` applies
 only entries for that path. Parsing or connection failure returns `false` and
 appends a message to `logs`.

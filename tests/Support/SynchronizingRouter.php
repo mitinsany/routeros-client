@@ -9,9 +9,15 @@ class SynchronizingRouter
     public $failures = [];
     private $nextId = 1;
 
-    public function getAll($path, $properties = false, $arguments = [])
-    {
-        $this->records[] = ['getAll', $path, $properties, $arguments];
+    public function getAll(
+        $path,
+        $properties = false,
+        $arguments = [],
+        $assoc = false,
+        $callback = false,
+        $queryWords = []
+    ) {
+        $this->records[] = ['getAll', $path, $properties, $arguments, $assoc, $callback, $queryWords];
 
         if (isset($this->failures['getAll'])) {
             return false;

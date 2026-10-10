@@ -8,6 +8,44 @@ use PHPUnit\Framework\TestCase;
 
 class ConfigurationSynchronizerReconciliationTest extends TestCase
 {
+    public function testSectionWithoutReadOptionsUsesLegacyGetAllCall()
+    {
+        $sync = $this->queueSynchronizer();
+        $router = $this->routerWith('/queue/simple', []);
+
+        $this->assertTrue($sync->update($router));
+        $this->assertSame(
+            [['getAll', '/queue/simple', false, [], false, false, []]],
+            $router->records
+        );
+    }
+
+    public function testReadOptionsPassProplistAndOrderedQueryWords()
+    {
+        $sync = $this->queueSynchronizer();
+        $this->assertTrue(method_exists($sync, 'readOptions'));
+        $sync->readOptions(
+            'queues',
+            ['.id', 'name', 'comment', 'disabled', 'max-limit'],
+            ['?comment=sync', '?disabled=no', '?#|!']
+        );
+        $router = $this->routerWith('/queue/simple', []);
+
+        $this->assertTrue($sync->update($router));
+        $this->assertSame(
+            [[
+                'getAll',
+                '/queue/simple',
+                ['.id', 'name', 'comment', 'disabled', 'max-limit'],
+                [],
+                false,
+                false,
+                ['?comment=sync', '?disabled=no', '?#|!']
+            ]],
+            $router->records
+        );
+    }
+
     public function testUnchangedManagedConfigurationDoesNotMutateRouter()
     {
         $sync = $this->queueSynchronizer();
@@ -215,6 +253,44 @@ class ConfigurationSynchronizerReconciliationTest extends TestCase
             [['set', '/queue/simple', ['target' => '192.0.2.11/32', '.id' => '*1']]],
             $router->mutatingRecords()
         );
+    }
+
+    public function testDuplicateKeysAreMatchedInConfigurationOrder()
+    {
+        $sync = $this->queueSynchronizer();
+        $sync->config('queues', ['name' => 'client', 'target' => '192.0.2.10/32']);
+        $sync->config('queues', ['name' => 'client', 'target' => '192.0.2.11/32']);
+        $router = $this->routerWith('/queue/simple', [
+            ['.id' => '*1', 'name' => 'client', 'target' => '192.0.2.10/32', 'comment' => 'sync'],
+            ['.id' => '*2', 'name' => 'client', 'target' => '192.0.2.11/32', 'comment' => 'sync']
+        ]);
+
+        $this->assertTrue($sync->update($router));
+        $this->assertSame([], $router->mutatingRecords());
+    }
+
+    public function testBinaryKeyValuesDoNotRequireJsonForMatching()
+    {
+        $sync = $this->queueSynchronizer();
+        $sync->config('queues', ['name' => "\xB1", 'target' => '192.0.2.10/32']);
+        $router = $this->routerWith('/queue/simple', [
+            ['.id' => '*1', 'name' => "\xB1", 'target' => '192.0.2.10/32', 'comment' => 'sync']
+        ]);
+
+        $this->assertTrue($sync->update($router));
+        $this->assertSame([], $router->mutatingRecords());
+    }
+
+    public function testIndexedMatchingPreservesLegacyFalseAndEmptyKeyEquivalence()
+    {
+        $sync = $this->queueSynchronizer();
+        $sync->config('queues', ['name' => '', 'target' => '192.0.2.10/32']);
+        $router = $this->routerWith('/queue/simple', [
+            ['.id' => '*1', 'name' => 'false', 'target' => '192.0.2.10/32', 'comment' => 'sync']
+        ]);
+
+        $this->assertTrue($sync->update($router));
+        $this->assertSame([], $router->mutatingRecords());
     }
 
     public function testValueSectionSetsOnlyDifferingFieldsAndHonorsLegacyEquivalence()
