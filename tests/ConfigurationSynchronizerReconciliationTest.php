@@ -210,6 +210,39 @@ class ConfigurationSynchronizerReconciliationTest extends TestCase
         $this->assertContains('add failed /queue/simple', $sync->logs);
     }
 
+    public function testTolerantModeContinuesAfterOperationFailures()
+    {
+        $sync = $this->queueSynchronizer();
+        $sync->section('addresses', '/ip/firewall/address-list', 'addset', 'address', ['comment' => 'sync']);
+        $sync->pass('addresses', ['comment' => 'sync']);
+        $sync->config('queues', ['name' => 'duplicate']);
+        $sync->config('queues', ['name' => 'client-2']);
+        $sync->config('addresses', ['address' => '192.0.2.10']);
+        $sync->continueOnError();
+
+        $router = $this->routerWith('/queue/simple', []);
+        $router->responses['/ip/firewall/address-list'] = [];
+        $router->failureCallbacks['add'] = static function ($path, array $attributes): bool {
+            return $path === '/queue/simple' && $attributes['name'] === 'duplicate';
+        };
+
+        $this->assertTrue($sync->update($router));
+        $this->assertSame(
+            [
+                'add failed /queue/simple',
+            ],
+            $sync->errors
+        );
+        $this->assertSame(
+            [
+                ['add', '/queue/simple', ['comment' => 'sync', 'name' => 'duplicate']],
+                ['add', '/queue/simple', ['comment' => 'sync', 'name' => 'client-2']],
+                ['add', '/ip/firewall/address-list', ['comment' => 'sync', 'address' => '192.0.2.10']],
+            ],
+            $router->mutatingRecords()
+        );
+    }
+
     public function testRemoveFailureStopsSynchronization()
     {
         $sync = $this->queueSynchronizer();
