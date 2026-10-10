@@ -243,6 +243,27 @@ class ConfigurationSynchronizerReconciliationTest extends TestCase
         );
     }
 
+    public function testTolerantModeStopsAfterReadFailure()
+    {
+        $sync = $this->queueSynchronizer();
+        $sync->section('addresses', '/ip/firewall/address-list', 'addset', 'address', ['comment' => 'sync']);
+        $sync->pass('addresses', ['comment' => 'sync']);
+        $sync->config('queues', ['name' => 'client-1']);
+        $sync->config('addresses', ['address' => '192.0.2.10']);
+        $sync->continueOnError();
+
+        $router = $this->routerWith('/queue/simple', []);
+        $router->failures['getAll'] = true;
+
+        $this->assertFalse($sync->update($router));
+        $this->assertSame(['getAll failed /queue/simple'], $sync->errors);
+        $this->assertSame([], $router->mutatingRecords());
+        $this->assertSame(
+            [['getAll', '/queue/simple', false, [], false, false, []]],
+            $router->records
+        );
+    }
+
     public function testRemoveFailureStopsSynchronization()
     {
         $sync = $this->queueSynchronizer();
