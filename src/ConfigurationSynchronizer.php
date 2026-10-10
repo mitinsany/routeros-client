@@ -276,7 +276,7 @@ class ConfigurationSynchronizer
         $this->errors = [];
 
         foreach ($this->sections as $alias => $section) {
-            if (!$this->updateSection($conn, $alias) && !$this->continueOnError) {
+            if (!$this->updateSection($conn, $alias)) {
                 return false;
             }
         }
@@ -285,7 +285,7 @@ class ConfigurationSynchronizer
             if ($this->sectionForReference($key) !== false) {
                 continue;
             }
-            if (!$this->updateStandalone($conn, $key, $configurations) && !$this->continueOnError) {
+            if (!$this->updateStandalone($conn, $key, $configurations)) {
                 return false;
             }
         }
