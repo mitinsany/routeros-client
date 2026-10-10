@@ -39,7 +39,7 @@ class RouterOS extends Api
      *
      * @return array|false|string
      */
-    public function getAll($cmd, $proplist = false, $args = [], $assoc = false, $callback = false)
+    public function getAll($cmd, $proplist = false, $args = [], $assoc = false, $callback = false, $queryWords = [])
     {
         $attributes = [];
         if ($proplist !== false) {
@@ -50,7 +50,7 @@ class RouterOS extends Api
             $attributes[$key] = $value;
         }
 
-        $result = $this->request($this->commandPath($cmd, 'print'), $attributes, $callback);
+        $result = $this->request($this->commandPath($cmd, 'print'), $attributes, $callback, $queryWords);
         if ($callback !== false || $result === false || !$assoc) {
             return $result;
         }
@@ -223,11 +223,14 @@ class RouterOS extends Api
         return $result !== false;
     }
 
-    private function request($path, array $attributes, $callback)
+    private function request($path, array $attributes, $callback, array $queryWords = [])
     {
         $words = [$path];
         foreach ($attributes as $key => $value) {
             $words[] = '=' . $key . '=' . $value;
+        }
+        foreach ($queryWords as $queryWord) {
+            $words[] = $queryWord;
         }
 
         if ($callback !== false) {

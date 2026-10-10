@@ -217,6 +217,37 @@ class ConfigurationSynchronizer
         return true;
     }
 
+    /**
+     * Limits the properties and records read for one configuration section.
+     *
+     * Query words must be complete RouterOS API words such as ?comment=sync.
+     */
+    public function readOptions($reference, $proplist = false, $queryWords = [])
+    {
+        $alias = $this->sectionForReference($reference);
+        if ($alias === false) {
+            return $this->error('Unknown configuration section: ' . $reference);
+        }
+        if ($proplist !== false && !is_array($proplist) && !is_string($proplist)) {
+            return $this->error('Read properties must be an array or string.');
+        }
+        if (!is_array($queryWords)) {
+            return $this->error('Query words must be an array.');
+        }
+        foreach ($queryWords as $queryWord) {
+            if (!is_string($queryWord) || substr($queryWord, 0, 1) !== '?') {
+                return $this->error('Query words must begin with ?.');
+            }
+        }
+
+        $this->sections[$alias]['readOptions'] = [
+            'proplist' => $proplist,
+            'queryWords' => array_values($queryWords)
+        ];
+
+        return true;
+    }
+
     public function call($cmd, $args)
     {
         if (!isset($this->commands[$cmd])) {
@@ -259,7 +290,18 @@ class ConfigurationSynchronizer
         }
 
         $section = $this->sections[$alias];
-        $current = $conn->getAll($section['path']);
+        if (isset($section['readOptions'])) {
+            $current = $conn->getAll(
+                $section['path'],
+                $section['readOptions']['proplist'],
+                [],
+                false,
+                false,
+                $section['readOptions']['queryWords']
+            );
+        } else {
+            $current = $conn->getAll($section['path']);
+        }
         if ($current === false) {
             return $this->error('getAll failed ' . $section['path']);
         }
@@ -359,6 +401,7 @@ class ConfigurationSynchronizer
             $desired[] = $configuration;
         }
 
+        $desiredIndex = $this->buildDesiredIndex($desired, $section['keys']);
         $matched = [];
         $currentOrder = [];
         foreach ($current as $record) {
@@ -372,7 +415,7 @@ class ConfigurationSynchronizer
                 continue;
             }
 
-            $index = $this->findMatch($record, $desired, $matched, $section['keys']);
+            $index = $this->findMatch($record, $desired, $matched, $section['keys'], $desiredIndex);
             if ($index !== false) {
                 if ($this->isDynamic($record)) {
                     if (!$this->remove($conn, $section['path'], $id)) {
@@ -506,28 +549,98 @@ class ConfigurationSynchronizer
         return false;
     }
 
-    private function findMatch(array $record, array $desired, array $matched, array $keys)
+    private function findMatch(array $record, array $desired, array $matched, array $keys, array $desiredIndex)
     {
         if (count($keys) === 0) {
             return false;
         }
+
+        $matchKey = $this->matchKey($record, $keys);
+        if ($matchKey !== false && isset($desiredIndex[$matchKey])) {
+            foreach ($desiredIndex[$matchKey] as $index) {
+                if (isset($matched[$index])) {
+                    continue;
+                }
+                if ($this->keysMatch($record, $desired[$index], $keys)) {
+                    return $index;
+                }
+            }
+        }
+
+        if (!$this->needsLegacyKeyFallback($record, $keys)) {
+            return false;
+        }
+
         foreach ($desired as $index => $attributes) {
             if (isset($matched[$index])) {
                 continue;
             }
-            $match = true;
-            foreach ($keys as $key) {
-                if (
-                    !array_key_exists($key, $record)
-                    || !array_key_exists($key, $attributes)
-                    || !$this->valuesEquivalent($record[$key], $attributes[$key])
-                ) {
-                    $match = false;
-                    break;
-                }
-            }
-            if ($match) {
+            if ($this->keysMatch($record, $attributes, $keys)) {
                 return $index;
+            }
+        }
+
+        return false;
+    }
+
+    private function buildDesiredIndex(array $desired, array $keys)
+    {
+        $index = [];
+        if (count($keys) === 0) {
+            return $index;
+        }
+
+        foreach ($desired as $position => $attributes) {
+            $matchKey = $this->matchKey($attributes, $keys);
+            if ($matchKey === false) {
+                continue;
+            }
+            if (!isset($index[$matchKey])) {
+                $index[$matchKey] = [];
+            }
+            $index[$matchKey][] = $position;
+        }
+
+        return $index;
+    }
+
+    private function matchKey(array $attributes, array $keys)
+    {
+        $values = [];
+        foreach ($keys as $key) {
+            if (!array_key_exists($key, $attributes)) {
+                return false;
+            }
+            $values[] = $this->normaliseValue($attributes[$key]);
+        }
+
+        return serialize($values);
+    }
+
+    private function keysMatch(array $record, array $attributes, array $keys)
+    {
+        foreach ($keys as $key) {
+            if (
+                !array_key_exists($key, $record)
+                || !array_key_exists($key, $attributes)
+                || !$this->valuesEquivalent($record[$key], $attributes[$key])
+            ) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function needsLegacyKeyFallback(array $record, array $keys)
+    {
+        foreach ($keys as $key) {
+            if (!array_key_exists($key, $record)) {
+                return false;
+            }
+            $value = $this->normaliseValue($record[$key]);
+            if ($value === '' || $value === 'false' || $value === 'no') {
+                return true;
             }
         }
 
