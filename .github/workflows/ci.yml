@@ -1,0 +1,109 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - php5
+      - php7
+      - php8
+  pull_request:
+    branches:
+      - php5
+      - php7
+      - php8
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  select-matrices:
+    name: Select verification matrix
+    runs-on: ubuntu-24.04
+    outputs:
+      test: ${{ steps.select.outputs.test }}
+      quality: ${{ steps.select.outputs.quality }}
+    steps:
+      - id: select
+        shell: bash
+        run: |
+          branch="${GITHUB_BASE_REF:-$GITHUB_REF_NAME}"
+
+          case "$branch" in
+            php5)
+              test='[{"name":"PHP 5.4","service":"php54","profile":"php54"}]'
+              quality='[{"name":"PHP 5.4","service":"php54","phpstan":"false","compatibility":"true"}]'
+              ;;
+            php7)
+              test='[{"name":"PHP 7.0","service":"php70","profile":"php70"},{"name":"PHP 7.2","service":"php72","profile":"php72"}]'
+              quality='[{"name":"PHP 7.0","service":"php70","phpstan":"true","compatibility":"false"}]'
+              ;;
+            php8)
+              test='[{"name":"PHP 8.0","service":"php80","profile":"php80"}]'
+              quality='[{"name":"PHP 8.0","service":"php80","phpstan":"true","compatibility":"false"}]'
+              ;;
+            *)
+              echo "Unsupported target branch: $branch" >&2
+              exit 1
+              ;;
+          esac
+
+          echo "test=$test" >> "$GITHUB_OUTPUT"
+          echo "quality=$quality" >> "$GITHUB_OUTPUT"
+
+  tests:
+    name: Tests (${{ matrix.name }})
+    needs: select-matrices
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.select-matrices.outputs.test) }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PHPUnit profile
+        run: >-
+          docker compose run --rm composer
+          --working-dir=/app/tools/phpunit/${{ matrix.profile }}
+          install --no-interaction --prefer-dist
+      - name: Run PHPUnit
+        run: docker compose run --rm ${{ matrix.service }} php tools/test.php
+
+  quality:
+    name: Quality (${{ matrix.name }})
+    needs: select-matrices
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.select-matrices.outputs.quality) }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install quality tools
+        run: >-
+          docker compose run --rm composer
+          --working-dir=/app/tools
+          install --no-interaction --prefer-dist
+      - name: Run PHP_CodeSniffer
+        run: >-
+          docker compose run --rm ${{ matrix.service }}
+          php tools/vendor/bin/phpcs --standard=phpcs.xml.dist
+      - name: Run PHPCompatibility
+        if: matrix.compatibility == 'true'
+        run: >-
+          docker compose run --rm ${{ matrix.service }}
+          php tools/vendor/bin/phpcs
+          --runtime-set installed_paths tools/vendor/phpcompatibility/php-compatibility
+          --standard=phpcompatibility.xml.dist
+      - name: Run PHPStan
+        if: matrix.phpstan == 'true'
+        run: >-
+          docker compose run --rm ${{ matrix.service }}
+          php tools/vendor/bin/phpstan analyse src
+          --configuration=phpstan.neon --no-progress
