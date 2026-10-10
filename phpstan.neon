@@ -1,4 +1,4 @@
 parameters:
     level: 0
-    autoload_directories:
+    scanDirectories:
         - src
