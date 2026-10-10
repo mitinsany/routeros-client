@@ -1,2 +1,6 @@
 includes:
     - tools/vendor/phpstan/phpstan/conf/config.level0.neon
+
+parameters:
+    autoload_directories:
+        - src
