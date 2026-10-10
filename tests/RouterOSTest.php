@@ -10,6 +10,15 @@ use PHPUnit\Framework\TestCase;
 
 class RouterOSTest extends TestCase
 {
+    public function testGetAllWithoutOptionsKeepsLegacyPrintRequest()
+    {
+        $transport = new ScriptedTransport([['!done']]);
+        $router = new TestRouterOS($transport);
+
+        $this->assertSame([], $router->getAll('/interface'));
+        $this->assertSame([['/interface/print']], $transport->sentences);
+    }
+
     public function testGetAllBuildsPrintCommandAndReturnsRecords()
     {
         $transport = new ScriptedTransport(
@@ -26,6 +35,34 @@ class RouterOSTest extends TestCase
         );
         $this->assertSame(
             [['/interface/print', '=.proplist=.id,name', '=disabled=no']],
+            $transport->sentences
+        );
+    }
+
+    public function testGetAllWritesProplistAndOrderedQueryWords()
+    {
+        $transport = new ScriptedTransport([['!done']]);
+        $router = new TestRouterOS($transport);
+
+        $this->assertSame(
+            [],
+            $router->getAll(
+                '/queue/simple',
+                ['.id', 'name', 'comment', 'disabled', 'max-limit'],
+                [],
+                false,
+                false,
+                ['?comment=sync', '?disabled=no', '?#|!']
+            )
+        );
+        $this->assertSame(
+            [[
+                '/queue/simple/print',
+                '=.proplist=.id,name,comment,disabled,max-limit',
+                '?comment=sync',
+                '?disabled=no',
+                '?#|!'
+            ]],
             $transport->sentences
         );
     }
