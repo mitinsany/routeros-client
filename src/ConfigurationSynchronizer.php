@@ -11,6 +11,7 @@ class ConfigurationSynchronizer
 {
     public $vars = [];
     public $logs = [];
+    public $errors = [];
     public $showIgnored = false;
     public $currentContext = '--internal--';
 
@@ -19,6 +20,7 @@ class ConfigurationSynchronizer
     private $passRules = [];
     private $sections = [];
     private $commands = [];
+    private $continueOnError = false;
 
     public function __get($name)
     {
@@ -146,8 +148,21 @@ class ConfigurationSynchronizer
     public function error($message)
     {
         $this->logs[] = $message;
+        $this->errors[] = $message;
 
         return false;
+    }
+
+    /**
+     * Keeps reconciling independent records and sections after RouterOS operation failures.
+     *
+     * Callers can inspect the public $errors list after update().
+     */
+    public function continueOnError($enabled = true)
+    {
+        $this->continueOnError = (bool) $enabled;
+
+        return $this;
     }
 
     public function define($key, $value = null)
@@ -260,9 +275,10 @@ class ConfigurationSynchronizer
     public function update($conn, $ret = false)
     {
         $this->logs = [];
+        $this->errors = [];
 
         foreach ($this->sections as $alias => $section) {
-            if (!$this->updateSection($conn, $alias)) {
+            if (!$this->updateSection($conn, $alias) && !$this->continueOnError) {
                 return false;
             }
         }
@@ -271,12 +287,12 @@ class ConfigurationSynchronizer
             if ($this->sectionForReference($key) !== false) {
                 continue;
             }
-            if (!$this->updateStandalone($conn, $key, $configurations)) {
+            if (!$this->updateStandalone($conn, $key, $configurations) && !$this->continueOnError) {
                 return false;
             }
         }
 
-        return true;
+        return $this->continueOnError || count($this->errors) === 0;
     }
 
     public function updateSection($conn, $reference)
@@ -331,7 +347,11 @@ class ConfigurationSynchronizer
                 continue;
             }
             if ($conn->set($path, $attributes) === false) {
-                return $this->operationFailed('set', $path);
+                $this->operationFailed('set', $path, null, $conn);
+                if (!$this->continueOnError) {
+                    return false;
+                }
+                continue;
             }
             $this->log('set', $path);
         }
@@ -373,7 +393,9 @@ class ConfigurationSynchronizer
             return true;
         }
         if ($conn->set($section['path'], $changes) === false) {
-            return $this->operationFailed('set', $section['path']);
+            $this->operationFailed('set', $section['path'], null, $conn);
+
+            return $this->continueOnError;
         }
         $this->log('set', $section['path']);
 
@@ -418,7 +440,7 @@ class ConfigurationSynchronizer
             $index = $this->findMatch($record, $desired, $matched, $section['keys'], $desiredIndex);
             if ($index !== false) {
                 if ($this->isDynamic($record)) {
-                    if (!$this->remove($conn, $section['path'], $id)) {
+                    if (!$this->remove($conn, $section['path'], $id) && !$this->continueOnError) {
                         return false;
                     }
                     continue;
@@ -431,7 +453,11 @@ class ConfigurationSynchronizer
                 if (count($changes) > 0) {
                     $changes['.id'] = $id;
                     if ($conn->set($section['path'], $changes) === false) {
-                        return $this->operationFailed('set', $section['path'], $id);
+                        $this->operationFailed('set', $section['path'], $id, $conn);
+                        if (!$this->continueOnError) {
+                            return false;
+                        }
+                        continue;
                     }
                     $this->log('set', $section['path'], $id);
                 }
@@ -439,7 +465,7 @@ class ConfigurationSynchronizer
             }
 
             if (($type === 'addset' || $type === 'addset_order') && $this->mayRemove($alias, $section, $record)) {
-                if (!$this->remove($conn, $section['path'], $id)) {
+                if (!$this->remove($conn, $section['path'], $id) && !$this->continueOnError) {
                     return false;
                 }
             }
@@ -476,7 +502,11 @@ class ConfigurationSynchronizer
             }
             $result = $conn->add($section['path'], $attributes);
             if ($result === false) {
-                return $this->operationFailed('add', $section['path']);
+                $this->operationFailed('add', $section['path'], null, $conn);
+                if (!$this->continueOnError) {
+                    return false;
+                }
+                continue;
             }
             if (is_string($result) && $result !== '') {
                 $matched[$index] = $result;
@@ -511,7 +541,11 @@ class ConfigurationSynchronizer
             }
             $before = $currentOrder[$position];
             if ($conn->move($path, $id, $before) === false) {
-                return $this->operationFailed('move', $path, $id);
+                $this->operationFailed('move', $path, $id, $conn);
+                if (!$this->continueOnError) {
+                    return false;
+                }
+                continue;
             }
             array_splice($currentOrder, $found, 1);
             array_splice($currentOrder, $position, 0, [$id]);
@@ -527,7 +561,7 @@ class ConfigurationSynchronizer
             return $this->error('RouterOS connection must provide remove().');
         }
         if ($conn->remove($path, $id) === false) {
-            return $this->operationFailed('remove', $path, $id);
+            return $this->operationFailed('remove', $path, $id, $conn);
         }
         $this->log('remove', $path, $id);
 
@@ -871,9 +905,15 @@ class ConfigurationSynchronizer
         return null;
     }
 
-    private function operationFailed($operation, $path, $id = null)
+    private function operationFailed($operation, $path, $id = null, $conn = null)
     {
-        return $this->error($operation . ' failed ' . $path . ($id === null ? '' : ' ' . $id));
+        $message = $operation . ' failed ' . $path . ($id === null ? '' : ' ' . $id);
+        if (is_object($conn) && isset($conn->errorString) && is_string($conn->errorString)
+            && $conn->errorString !== '') {
+            $message .= ': ' . $conn->errorString;
+        }
+
+        return $this->error($message);
     }
 
     private function log($operation, $path, $id = null, $before = null)
