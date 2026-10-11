@@ -40,8 +40,10 @@ class SynchronizingRouter
     {
         $this->records[] = ['add', $path, $attributes];
 
-        if (isset($this->failureCallbacks['add'])
-            && call_user_func($this->failureCallbacks['add'], $path, $attributes)) {
+        if (
+            isset($this->failureCallbacks['add'])
+            && call_user_func($this->failureCallbacks['add'], $path, $attributes)
+        ) {
             return false;
         }
         if (isset($this->failures['add'])) {
