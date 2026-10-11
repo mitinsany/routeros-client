@@ -906,8 +906,10 @@ class ConfigurationSynchronizer
     private function operationFailed($operation, $path, $id = null, $conn = null)
     {
         $message = $operation . ' failed ' . $path . ($id === null ? '' : ' ' . $id);
-        if (is_object($conn) && isset($conn->errorString) && is_string($conn->errorString)
-            && $conn->errorString !== '') {
+        if (
+            is_object($conn) && isset($conn->errorString) && is_string($conn->errorString)
+            && $conn->errorString !== ''
+        ) {
             $message .= ': ' . $conn->errorString;
         }
 

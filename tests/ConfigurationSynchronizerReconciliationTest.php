@@ -220,7 +220,7 @@ class ConfigurationSynchronizerReconciliationTest extends TestCase
 
         $router = $this->routerWith('/queue/simple', []);
         $router->responses['/ip/firewall/address-list'] = [];
-        $router->failureCallbacks['add'] = static function ($path, array $attributes): bool {
+        $router->failureCallbacks['add'] = static function ($path, array $attributes) {
             return $path === '/queue/simple' && $attributes['name'] === 'duplicate';
         };
 
