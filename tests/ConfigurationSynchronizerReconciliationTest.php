@@ -153,6 +153,49 @@ class ConfigurationSynchronizerReconciliationTest extends TestCase
         );
     }
 
+    public function testMultipleDynamicDuplicatesLeaveDesiredRecordAvailableForAdd()
+    {
+        $sync = $this->queueSynchronizer();
+        $sync->config('queues', ['name' => 'same']);
+        $router = $this->routerWith('/queue/simple', [
+            ['.id' => '*d1', 'name' => 'same', 'comment' => 'sync', 'dynamic' => 'true'],
+            ['.id' => '*d2', 'name' => 'same', 'comment' => 'sync', 'dynamic' => 'true']
+        ]);
+
+        $this->assertTrue($sync->update($router));
+        $this->assertSame(
+            [
+                ['remove', '/queue/simple', '*d1'],
+                ['remove', '/queue/simple', '*d2'],
+                ['add', '/queue/simple', ['comment' => 'sync', 'name' => 'same']]
+            ],
+            $router->mutatingRecords()
+        );
+    }
+
+    public function testFailedSetInTolerantModeStillClaimsItsDuplicateSlot()
+    {
+        $sync = $this->queueSynchronizer();
+        $sync->continueOnError();
+        $sync->config('queues', ['name' => 'same', 'target' => 'first']);
+        $sync->config('queues', ['name' => 'same', 'target' => 'second']);
+        $router = $this->routerWith('/queue/simple', [
+            ['.id' => '*1', 'name' => 'same', 'comment' => 'sync', 'target' => 'old'],
+            ['.id' => '*2', 'name' => 'same', 'comment' => 'sync', 'target' => 'old']
+        ]);
+        $router->failures['set'] = true;
+
+        $this->assertTrue($sync->update($router));
+        $this->assertSame(
+            [
+                ['set', '/queue/simple', ['target' => 'first', '.id' => '*1']],
+                ['set', '/queue/simple', ['target' => 'second', '.id' => '*2']]
+            ],
+            $router->mutatingRecords()
+        );
+        $this->assertCount(2, $sync->errors);
+    }
+
     public function testOrderedSectionMovesOnlyAnOutOfOrderExistingEntry()
     {
         $sync = new ConfigurationSynchronizer();
