@@ -12,7 +12,7 @@ namespace MitinSany\RouterOS\Synchronization;
 final class ValueComparison
 {
     /** @return bool Whether the two values compare equal under legacy rules. */
-    public static function equivalent($left, $right)
+    public static function equivalent($left, $right): bool
     {
         $left = self::normalise($left);
         $right = self::normalise($right);
@@ -25,7 +25,7 @@ final class ValueComparison
     }
 
     /** @return string Normalized value, preserving binary input. */
-    public static function normalise($value)
+    public static function normalise($value): string
     {
         if ($value === false) {
             $value = 'false';
@@ -41,7 +41,7 @@ final class ValueComparison
     }
 
     /** @return array Desired fields that are absent or different in the current record. */
-    public static function changes(array $current, array $desired)
+    public static function changes(array $current, array $desired): array
     {
         $changes = [];
         foreach ($desired as $key => $value) {

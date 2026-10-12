@@ -83,7 +83,7 @@ final class DesiredRecordIndex
         $this->matched[$index] = true;
     }
 
-    private function buildDesiredIndex(array $desired, array $keys)
+    private function buildDesiredIndex(array $desired, array $keys): array
     {
         $index = [];
         if (count($keys) === 0) {
@@ -117,7 +117,7 @@ final class DesiredRecordIndex
         return serialize($values);
     }
 
-    private function keysMatch(array $record, array $attributes, array $keys)
+    private function keysMatch(array $record, array $attributes, array $keys): bool
     {
         foreach ($keys as $key) {
             if (
@@ -132,7 +132,7 @@ final class DesiredRecordIndex
         return true;
     }
 
-    private function needsLegacyKeyFallback(array $record, array $keys)
+    private function needsLegacyKeyFallback(array $record, array $keys): bool
     {
         foreach ($keys as $key) {
             if (!array_key_exists($key, $record)) {

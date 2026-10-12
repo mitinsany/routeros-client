@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace MitinSany\RouterOS\Protocol;
 
 /**
@@ -10,7 +12,7 @@ namespace MitinSany\RouterOS\Protocol;
 final class SentenceWords
 {
     /** @return array Ordered command, attribute and query words. */
-    public static function command($command, $attributes, array $queryWords = [])
+    public static function command($command, $attributes, array $queryWords = []): array
     {
         $words = [$command];
         foreach ($attributes as $key => $value) {
@@ -24,7 +26,7 @@ final class SentenceWords
     }
 
     /** @return array Response attributes, optionally excluding callback tags. */
-    public static function attributes(array $sentence, $excludeTag = false)
+    public static function attributes(array $sentence, $excludeTag = false): array
     {
         $attributes = [];
         foreach ($sentence as $word) {
