@@ -437,7 +437,7 @@ class ConfigurationSynchronizer
                 continue;
             }
 
-            $index = $desiredIndex->find($record, $matched);
+            $index = $desiredIndex->find($record);
             if ($index !== false) {
                 if ($this->isDynamic($record)) {
                     if (!$this->remove($conn, $section['path'], $id) && !$this->continueOnError) {
@@ -447,6 +447,7 @@ class ConfigurationSynchronizer
                 }
                 $matched[$index] = $id;
                 if ($id !== null) {
+                    $desiredIndex->markMatched($index);
                     $currentOrder[] = $id;
                 }
                 $changes = ValueComparison::changes($record, $desired[$index]);
