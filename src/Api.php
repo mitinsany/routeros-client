@@ -3,6 +3,7 @@
 namespace MitinSany\RouterOS;
 
 use Exception;
+use MitinSany\RouterOS\Protocol\SentenceWords;
 use MitinSany\RouterOS\Enum\LoginMode;
 use MitinSany\RouterOS\Protocol\StreamTransport;
 use MitinSany\RouterOS\Protocol\WordCodec;
@@ -135,7 +136,7 @@ class Api
         $records = [];
         foreach ($response as $sentence) {
             if ($this->sentenceHasType($sentence, '!re')) {
-                $records[] = $this->parseAttributes($sentence);
+                $records[] = SentenceWords::attributes($sentence);
                 continue;
             }
 
@@ -194,10 +195,7 @@ class Api
      */
     public function command($com, $arr = [])
     {
-        $words = [$com];
-        foreach ($arr as $key => $value) {
-            $words[] = '=' . $key . '=' . $value;
-        }
+        $words = SentenceWords::command($com, $arr);
 
         try {
             $this->write($words);
@@ -334,7 +332,7 @@ class Api
             if (!$this->sentenceHasType($sentence, '!done')) {
                 continue;
             }
-            $attributes = $this->parseAttributes($sentence);
+            $attributes = SentenceWords::attributes($sentence);
             if (array_key_exists('ret', $attributes)) {
                 return $attributes['ret'];
             }
@@ -370,7 +368,7 @@ class Api
 
     private function sentenceHasType(array $sentence, $type)
     {
-        return isset($sentence[0]) && $sentence[0] === $type;
+        return SentenceWords::type($sentence) === $type;
     }
 
     private function setErrorFromResponse(array $responses)
@@ -380,27 +378,10 @@ class Api
                 continue;
             }
 
-            $attributes = $this->parseAttributes($sentence);
+            $attributes = SentenceWords::attributes($sentence);
             $this->errorString = isset($attributes['message']) ? $attributes['message'] : 'RouterOS request failed.';
 
             return;
         }
-    }
-
-    private function parseAttributes(array $sentence)
-    {
-        $attributes = [];
-        foreach ($sentence as $word) {
-            if (!is_string($word) || substr($word, 0, 1) !== '=') {
-                continue;
-            }
-
-            $parts = explode('=', substr($word, 1), 2);
-            if (count($parts) === 2) {
-                $attributes[$parts[0]] = $parts[1];
-            }
-        }
-
-        return $attributes;
     }
 }
