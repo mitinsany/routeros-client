@@ -350,8 +350,7 @@ class ConfigurationSynchronizer
                 continue;
             }
             if ($conn->set($path, $attributes) === false) {
-                $this->operationFailed('set', $path, null, $conn);
-                if (!$this->continueOnError) {
+                if (!$this->operationFailed('set', $path, null, $conn)) {
                     return false;
                 }
                 continue;
@@ -396,9 +395,7 @@ class ConfigurationSynchronizer
             return true;
         }
         if ($conn->set($section['path'], $changes) === false) {
-            $this->operationFailed('set', $section['path'], null, $conn);
-
-            return $this->continueOnError;
+            return $this->operationFailed('set', $section['path'], null, $conn);
         }
         $this->log('set', $section['path']);
 
@@ -456,8 +453,7 @@ class ConfigurationSynchronizer
                 if (count($changes) > 0) {
                     $changes['.id'] = $id;
                     if ($conn->set($section['path'], $changes) === false) {
-                        $this->operationFailed('set', $section['path'], $id, $conn);
-                        if (!$this->continueOnError) {
+                        if (!$this->operationFailed('set', $section['path'], $id, $conn)) {
                             return false;
                         }
                         continue;
@@ -505,8 +501,7 @@ class ConfigurationSynchronizer
             }
             $result = $conn->add($section['path'], $attributes);
             if ($result === false) {
-                $this->operationFailed('add', $section['path'], null, $conn);
-                if (!$this->continueOnError) {
+                if (!$this->operationFailed('add', $section['path'], null, $conn)) {
                     return false;
                 }
                 continue;
@@ -544,8 +539,7 @@ class ConfigurationSynchronizer
             }
             $before = $currentOrder[$position];
             if ($conn->move($path, $id, $before) === false) {
-                $this->operationFailed('move', $path, $id, $conn);
-                if (!$this->continueOnError) {
+                if (!$this->operationFailed('move', $path, $id, $conn)) {
                     return false;
                 }
                 continue;
@@ -771,6 +765,7 @@ class ConfigurationSynchronizer
         return null;
     }
 
+    /** @return bool Whether reconciliation may continue after this mutation failure. */
     private function operationFailed($operation, $path, $id = null, $conn = null)
     {
         $message = $operation . ' failed ' . $path . ($id === null ? '' : ' ' . $id);
@@ -781,7 +776,9 @@ class ConfigurationSynchronizer
             $message .= ': ' . $conn->errorString;
         }
 
-        return $this->error($message);
+        $this->error($message);
+
+        return $this->continueOnError;
     }
 
     private function log($operation, $path, $id = null, $before = null)
