@@ -14,6 +14,8 @@ final class DesiredRecordIndex
     private $desired;
     private $keys;
     private $index;
+    private $matched = [];
+    private $cursors = [];
 
     public function __construct(array $desired, array $keys)
     {
@@ -25,10 +27,9 @@ final class DesiredRecordIndex
     /**
      * Finds a desired index without consuming it; the caller records successful matches.
      *
-     * @param array $matched Desired indexes mapped to existing RouterOS identifiers.
      * @return int|string|false Desired array key, or false when no match is available.
      */
-    public function find(array $record, array $matched)
+    public function find(array $record)
     {
         $desired = $this->desired;
         $keys = $this->keys;
@@ -40,13 +41,19 @@ final class DesiredRecordIndex
 
         $matchKey = $this->matchKey($record, $keys);
         if ($matchKey !== false && isset($desiredIndex[$matchKey])) {
-            foreach ($desiredIndex[$matchKey] as $index) {
-                if (isset($matched[$index])) {
+            $cursor = isset($this->cursors[$matchKey]) ? $this->cursors[$matchKey] : 0;
+            $bucket = $desiredIndex[$matchKey];
+            while (isset($bucket[$cursor])) {
+                $index = $bucket[$cursor];
+                if (isset($this->matched[$index])) {
+                    $cursor++;
+                    $this->cursors[$matchKey] = $cursor;
                     continue;
                 }
                 if ($this->keysMatch($record, $desired[$index], $keys)) {
                     return $index;
                 }
+                $cursor++;
             }
         }
 
@@ -55,7 +62,7 @@ final class DesiredRecordIndex
         }
 
         foreach ($desired as $index => $attributes) {
-            if (isset($matched[$index])) {
+            if (isset($this->matched[$index])) {
                 continue;
             }
             if ($this->keysMatch($record, $attributes, $keys)) {
@@ -64,6 +71,16 @@ final class DesiredRecordIndex
         }
 
         return false;
+    }
+
+    /**
+     * Excludes a desired record after matching a static record with a non-null identifier.
+     *
+     * Dynamic records do not claim a slot because a static record still needs to be added.
+     */
+    public function markMatched($index)
+    {
+        $this->matched[$index] = true;
     }
 
     private function buildDesiredIndex(array $desired, array $keys)
