@@ -11,11 +11,11 @@ namespace MitinSany\RouterOS\Synchronization;
  */
 final class DesiredRecordIndex
 {
-    private $desired;
-    private $keys;
-    private $index;
-    private $matched = [];
-    private $cursors = [];
+    private array $desired;
+    private array $keys;
+    private array $index;
+    private array $matched = [];
+    private array $cursors = [];
 
     public function __construct(array $desired, array $keys)
     {
@@ -29,7 +29,7 @@ final class DesiredRecordIndex
      *
      * @return int|string|false Desired array key, or false when no match is available.
      */
-    public function find(array $record)
+    public function find(array $record): int|string|false
     {
         $desired = $this->desired;
         $keys = $this->keys;
@@ -78,7 +78,7 @@ final class DesiredRecordIndex
      *
      * Dynamic records do not claim a slot because a static record still needs to be added.
      */
-    public function markMatched($index)
+    public function markMatched(int|string $index): void
     {
         $this->matched[$index] = true;
     }
@@ -104,7 +104,7 @@ final class DesiredRecordIndex
         return $index;
     }
 
-    private function matchKey(array $attributes, array $keys)
+    private function matchKey(array $attributes, array $keys): string|false
     {
         $values = [];
         foreach ($keys as $key) {

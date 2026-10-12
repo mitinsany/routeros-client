@@ -43,7 +43,7 @@ final class SentenceWords
     }
 
     /** @return string|false First callback tag, accepting both legacy forms. */
-    public static function tag(array $sentence)
+    public static function tag(array $sentence): string|false
     {
         foreach ($sentence as $word) {
             if (substr($word, 0, 6) === '=.tag=') {
