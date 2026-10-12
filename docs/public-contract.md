@@ -20,10 +20,13 @@ sends the modern request, then uses the same connection for a legacy response
 only when RouterOS returns a valid challenge. It returns `false` for a trap,
 transport error, invalid challenge, or unsuccessful connection, setting
 `errorString` when a message is available. `command($path, $attributes)` writes `=key=value` attributes and
-returns an array of `!re` records; it returns `false` after `!trap` or a
-transport failure. Attribute values preserve embedded equal signs. `read()`
-stops after `!done` or `!trap`; with its default argument it returns parsed
-records, otherwise it returns raw response sentences.
+returns an array of `!re` records; it returns `false` after `!trap`, `!fatal`,
+or a transport failure. Attribute values preserve embedded equal signs.
+`read()` stops after `!done` or terminal `!fatal`; a `!trap` is read through
+the following `!done`. With its default argument it returns parsed records,
+otherwise it returns raw response sentences. A terminal fatal reply does not
+require a following `!done`; its message is preserved in `errorString` by
+`connect()` and `command()`.
 
 ## RouterOS
 
@@ -44,13 +47,13 @@ Setting `$continue` to `false` stops further callback invocation.
 
 ## ConfigurationSynchronizer
 
-Public properties: `vars`, `logs`, `showIgnored`, and `currentContext`.
+Public properties: `vars`, `logs`, `errors`, `showIgnored`, and `currentContext`.
 
 Public methods: `variable()`, `configureWithArguments()`,
 `configureReversedWithArguments()`, `ignoreWithArguments()`,
 `passWithArguments()`, `parseFile()`, `replace()`, `error()`, `define()`,
 `config()`, `cmd()`, `ignore()`, `pass()`, `section()`, `readOptions()`, `call()`, `update()`,
-and `updateSection()`. It also supports PHP property magic methods.
+`updateSection()`, and `continueOnError()`. It also supports PHP property magic methods.
 
 Configuration text is line-oriented. Blank lines and `#` comments are ignored.
 `define key value` stores a variable; `config /path key=value ...` adds a
@@ -63,3 +66,15 @@ sets the print `.proplist` and ordered query words for that section; without it,
 the synchronizer keeps using `getAll($path)`. `updateSection()` applies
 only entries for that path. Parsing or connection failure returns `false` and
 appends a message to `logs`.
+
+Mutation failures stop reconciliation by default. `continueOnError(true)`
+allows later records and sections to be processed after mutation failures;
+`update()` returns `true` in that mode when processing completes, even if
+mutations failed. Callers inspect `errors` for those failures. Read failures
+still stop reconciliation and return `false`. `logs` and `errors` are reset
+at the beginning of each `update()`.
+
+Classes marked `@internal`, including `Protocol\SentenceWords` and the
+`Synchronization` helpers, are implementation details outside this public
+contract. Callers continue to use `Api`, `RouterOS`, and
+`ConfigurationSynchronizer`.
