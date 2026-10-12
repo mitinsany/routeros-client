@@ -8,6 +8,7 @@ class SynchronizingRouter
     public $records = [];
     public $failures = [];
     public $failureCallbacks = [];
+    public $errorString;
     private $nextId = 1;
 
     public function getAll(
