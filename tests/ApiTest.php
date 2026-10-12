@@ -104,12 +104,29 @@ class ApiTest extends TestCase
 
     public function testAutoLoginDoesNotFallbackAfterFatalReply()
     {
-        $transport = new ScriptedTransport([['!fatal', '=message=closed'], ['!done']]);
+        $transport = new ScriptedTransport([['!fatal', '=message=closed']]);
         $api = new TestApi($transport);
 
         $this->assertFalse($api->connect('router.example', 'admin', 'secret'));
         $this->assertSame('closed', $api->errorString);
         $this->assertCount(1, $transport->sentences);
+        $this->assertTrue($transport->closed);
+        $this->assertFalse($api->connected);
+    }
+
+    public function testCommandPreservesFatalErrorWithoutWaitingForDone()
+    {
+        $api = new TestApi(new ScriptedTransport([['!fatal', '=message=session terminated']]));
+
+        $this->assertFalse($api->command('/interface/print'));
+        $this->assertSame('session terminated', $api->errorString);
+    }
+
+    public function testRawReadReturnsFatalSentenceWithoutReadingAnotherReply()
+    {
+        $api = new TestApi(new ScriptedTransport([['!fatal', '=message=session terminated']]));
+
+        $this->assertSame([['!fatal', '=message=session terminated']], $api->read(false));
     }
 
     public function testAutoLoginDoesNotFallbackAfterTransportFailure()
