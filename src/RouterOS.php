@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MitinSany\RouterOS;
 
 use Exception;
+use MitinSany\RouterOS\Protocol\SentenceWords;
 
 /**
  * RouterOS command helpers built on the synchronous API client.
@@ -185,18 +186,18 @@ class RouterOS extends Api
         }
 
         foreach ($responses as $sentence) {
-            $tag = $this->tagFromSentence($sentence);
+            $tag = SentenceWords::tag($sentence);
             if ($tag === false || !isset($this->callbacks[$tag])) {
                 continue;
             }
 
             $callback = $this->callbacks[$tag];
-            if ($this->sentenceType($sentence) === '!trap') {
-                call_user_func($callback, $this, false, $this->attributesFromSentence($sentence));
+            if (SentenceWords::type($sentence) === '!trap') {
+                call_user_func($callback, $this, false, SentenceWords::attributes($sentence, true));
                 unset($this->callbacks[$tag]);
-            } elseif ($this->sentenceType($sentence) === '!re') {
-                call_user_func($callback, $this, true, $this->attributesFromSentence($sentence));
-            } elseif ($this->sentenceType($sentence) === '!done') {
+            } elseif (SentenceWords::type($sentence) === '!re') {
+                call_user_func($callback, $this, true, SentenceWords::attributes($sentence, true));
+            } elseif (SentenceWords::type($sentence) === '!done') {
                 call_user_func($callback, $this, true, null);
                 unset($this->callbacks[$tag]);
             }
@@ -225,13 +226,7 @@ class RouterOS extends Api
 
     private function request($path, array $attributes, $callback, array $queryWords = [])
     {
-        $words = [$path];
-        foreach ($attributes as $key => $value) {
-            $words[] = '=' . $key . '=' . $value;
-        }
-        foreach ($queryWords as $queryWord) {
-            $words[] = $queryWord;
-        }
+        $words = SentenceWords::command($path, $attributes, $queryWords);
 
         if ($callback !== false) {
             $tag = 'callback-' . $this->tagIndex;
@@ -257,42 +252,5 @@ class RouterOS extends Api
     private function commandPath($cmd, $action)
     {
         return rtrim($cmd, '/') . '/' . $action;
-    }
-
-    private function sentenceType(array $sentence)
-    {
-        return isset($sentence[0]) ? $sentence[0] : false;
-    }
-
-    private function tagFromSentence(array $sentence)
-    {
-        foreach ($sentence as $word) {
-            if (substr($word, 0, 6) === '=.tag=') {
-                return substr($word, 6);
-            }
-
-            if (substr($word, 0, 5) === '.tag=') {
-                return substr($word, 5);
-            }
-        }
-
-        return false;
-    }
-
-    private function attributesFromSentence(array $sentence)
-    {
-        $attributes = [];
-        foreach ($sentence as $word) {
-            if (substr($word, 0, 1) !== '=') {
-                continue;
-            }
-
-            $parts = explode('=', substr($word, 1), 2);
-            if (count($parts) === 2 && $parts[0] !== '.tag') {
-                $attributes[$parts[0]] = $parts[1];
-            }
-        }
-
-        return $attributes;
     }
 }
