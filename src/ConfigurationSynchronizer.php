@@ -2,6 +2,9 @@
 
 namespace MitinSany\RouterOS;
 
+use MitinSany\RouterOS\Synchronization\DesiredRecordIndex;
+use MitinSany\RouterOS\Synchronization\ValueComparison;
+
 /**
  * Synchronizes declarative RouterOS configuration with a RouterOS client.
  */
@@ -386,7 +389,7 @@ class ConfigurationSynchronizer
             return true;
         }
 
-        $changes = $this->changes($records[0], $desired);
+        $changes = ValueComparison::changes($records[0], $desired);
         if (count($changes) === 0) {
             return true;
         }
@@ -421,7 +424,7 @@ class ConfigurationSynchronizer
             $desired[] = $configuration;
         }
 
-        $desiredIndex = $this->buildDesiredIndex($desired, $section['keys']);
+        $desiredIndex = new DesiredRecordIndex($desired, $section['keys']);
         $matched = [];
         $currentOrder = [];
         foreach ($current as $record) {
@@ -435,7 +438,7 @@ class ConfigurationSynchronizer
                 continue;
             }
 
-            $index = $this->findMatch($record, $desired, $matched, $section['keys'], $desiredIndex);
+            $index = $desiredIndex->find($record, $matched);
             if ($index !== false) {
                 if ($this->isDynamic($record)) {
                     if (!$this->remove($conn, $section['path'], $id) && !$this->continueOnError) {
@@ -447,7 +450,7 @@ class ConfigurationSynchronizer
                 if ($id !== null) {
                     $currentOrder[] = $id;
                 }
-                $changes = $this->changes($record, $desired[$index]);
+                $changes = ValueComparison::changes($record, $desired[$index]);
                 if (count($changes) > 0) {
                     $changes['.id'] = $id;
                     if ($conn->set($section['path'], $changes) === false) {
@@ -579,116 +582,6 @@ class ConfigurationSynchronizer
         }
 
         return false;
-    }
-
-    private function findMatch(array $record, array $desired, array $matched, array $keys, array $desiredIndex)
-    {
-        if (count($keys) === 0) {
-            return false;
-        }
-
-        $matchKey = $this->matchKey($record, $keys);
-        if ($matchKey !== false && isset($desiredIndex[$matchKey])) {
-            foreach ($desiredIndex[$matchKey] as $index) {
-                if (isset($matched[$index])) {
-                    continue;
-                }
-                if ($this->keysMatch($record, $desired[$index], $keys)) {
-                    return $index;
-                }
-            }
-        }
-
-        if (!$this->needsLegacyKeyFallback($record, $keys)) {
-            return false;
-        }
-
-        foreach ($desired as $index => $attributes) {
-            if (isset($matched[$index])) {
-                continue;
-            }
-            if ($this->keysMatch($record, $attributes, $keys)) {
-                return $index;
-            }
-        }
-
-        return false;
-    }
-
-    private function buildDesiredIndex(array $desired, array $keys)
-    {
-        $index = [];
-        if (count($keys) === 0) {
-            return $index;
-        }
-
-        foreach ($desired as $position => $attributes) {
-            $matchKey = $this->matchKey($attributes, $keys);
-            if ($matchKey === false) {
-                continue;
-            }
-            if (!isset($index[$matchKey])) {
-                $index[$matchKey] = [];
-            }
-            $index[$matchKey][] = $position;
-        }
-
-        return $index;
-    }
-
-    private function matchKey(array $attributes, array $keys)
-    {
-        $values = [];
-        foreach ($keys as $key) {
-            if (!array_key_exists($key, $attributes)) {
-                return false;
-            }
-            $values[] = $this->normaliseValue($attributes[$key]);
-        }
-
-        return serialize($values);
-    }
-
-    private function keysMatch(array $record, array $attributes, array $keys)
-    {
-        foreach ($keys as $key) {
-            if (
-                !array_key_exists($key, $record)
-                || !array_key_exists($key, $attributes)
-                || !$this->valuesEquivalent($record[$key], $attributes[$key])
-            ) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private function needsLegacyKeyFallback(array $record, array $keys)
-    {
-        foreach ($keys as $key) {
-            if (!array_key_exists($key, $record)) {
-                return false;
-            }
-            $value = $this->normaliseValue($record[$key]);
-            if ($value === '' || $value === 'false' || $value === 'no') {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private function changes(array $current, array $desired)
-    {
-        $changes = [];
-        foreach ($desired as $key => $value) {
-            if (!array_key_exists($key, $current) || !$this->valuesEquivalent($current[$key], $value)) {
-                $changes[$key] = $value;
-            }
-        }
-
-        return $changes;
     }
 
     private function desiredAttributes(array $section, array $configuration)
@@ -847,7 +740,7 @@ class ConfigurationSynchronizer
     private function matches(array $attributes, array $rule)
     {
         foreach ($rule as $key => $value) {
-            if (!array_key_exists($key, $attributes) || !$this->valuesEquivalent($attributes[$key], $value)) {
+            if (!array_key_exists($key, $attributes) || !ValueComparison::equivalent($attributes[$key], $value)) {
                 return false;
             }
         }
@@ -855,41 +748,14 @@ class ConfigurationSynchronizer
         return true;
     }
 
-    private function valuesEquivalent($left, $right)
-    {
-        $left = $this->normaliseValue($left);
-        $right = $this->normaliseValue($right);
-        if ($left === $right) {
-            return true;
-        }
-
-        return ($left === '' && ($right === 'false' || $right === 'no'))
-            || ($right === '' && ($left === 'false' || $left === 'no'));
-    }
-
-    private function normaliseValue($value)
-    {
-        if ($value === false) {
-            $value = 'false';
-        } elseif ($value === true) {
-            $value = 'true';
-        } elseif ($value === null) {
-            $value = '';
-        } else {
-            $value = (string) $value;
-        }
-
-        return str_replace(';', ',', $value);
-    }
-
     private function isDefault(array $record)
     {
-        return isset($record['default']) && $this->normaliseValue($record['default']) === 'true';
+        return isset($record['default']) && ValueComparison::normalise($record['default']) === 'true';
     }
 
     private function isDynamic(array $record)
     {
-        return isset($record['dynamic']) && $this->normaliseValue($record['dynamic']) === 'true';
+        return isset($record['dynamic']) && ValueComparison::normalise($record['dynamic']) === 'true';
     }
 
     private function nextMatchedId(array $matched, $index, $count)
