@@ -96,7 +96,7 @@ class Api
     }
 
     /**
-     * Reads response sentences through !done or !trap.
+     * Reads response sentences through !done or terminal !fatal.
      *
      * @return array|false Parsed records or raw sentences when disabled.
      */
@@ -108,7 +108,7 @@ class Api
             $sentence = $this->getTransport()->readSentence();
             $responses[] = $sentence;
 
-            if ($this->sentenceHasType($sentence, '!done')) {
+            if ($this->sentenceHasType($sentence, '!done') || $this->sentenceHasType($sentence, '!fatal')) {
                 break;
             }
         }
